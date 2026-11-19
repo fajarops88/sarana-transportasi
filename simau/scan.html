@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Verifikasi Kartu Pengawasan — Dishub Kota Balikpapan</title>
+  <meta name="robots" content="noindex, nofollow">
+  <meta name="theme-color" content="#0F3B67">
+  <link rel="icon" href="../icons/logo.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://script.google.com">
+  <link rel="preconnect" href="https://script.googleusercontent.com">
+  <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" onload="this.onload=null;this.rel='stylesheet'">
+  <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0..1,0&display=block" onload="this.onload=null;this.rel='stylesheet'">
+  <link rel="stylesheet" href="../css/app.css?v=1.0.0">
+  <style>
+    body { background: var(--bg); min-height: 100vh; }
+    .scan { max-width: 520px; margin: 0 auto; padding: 20px 16px 40px; }
+    .scan-h { display: flex; align-items: center; gap: 12px; margin-bottom: 18px; }
+    .scan-h b { display: block; font-size: 15px; } .scan-h small { color: var(--muted); }
+    .vonis { display: flex; align-items: center; gap: 14px; padding: 18px; border-radius: var(--r); color: #fff; }
+    .vonis .ms { font-size: 40px; }
+    .vonis.ok { background: var(--ok); } .vonis.bad { background: var(--bad); } .vonis.crit { background: #7F1D1D; } .vonis.netral { background: var(--slate, #475569); }
+    .vonis h2 { color: #fff; font-size: 20px; margin: 0; } .vonis p { margin: 2px 0 0; opacity: .92; font-size: 14px; }
+  </style>
+</head>
+<body>
+  <main class="scan">
+    <div class="scan-h"><img src="../icons/logo.svg" alt="" width="44" height="44"><div><b>Verifikasi Kartu Pengawasan</b><small>Dinas Perhubungan Kota Balikpapan</small></div></div>
+    <div id="isi"><div class="card">
+      <div class="card-b"><div class="sk sk-big"></div><div class="sk sk-line" style="width:70%"></div><div class="sk sk-line" style="width:50%"></div><div class="sk sk-line" style="width:60%"></div></div>
+    </div></div>
+    <p class="small muted center" style="margin-top:20px"><a href="../#/cek">Cek status kendaraan lain</a> · <a href="../">Portal layanan</a></p>
+  </main>
+  <script src="../js/config.js?v=1.0.0" defer></script>
+  <script src="../js/versi.js?v=1.0.0" defer></script>
+  <script src="../js/core.js?v=1.0.0" defer></script>
+  <script>
+    document.addEventListener('DOMContentLoaded', function () {
+      var esc = App.esc, ikon = App.ikon, fmt = App.fmt, el = document.getElementById('isi');
+      var id = (App.q('id') || '').trim();
+      function pesan(ic, judul, isi, kelas) {
+        el.innerHTML = '<div class="vonis ' + (kelas || 'netral') + '">' + ikon(ic) + '<div><h2>' + esc(judul) + '</h2><p>' + esc(isi) + '</p></div></div>';
+      }
+      if (!id) { pesan('qr_code_2', 'Kode QR tidak lengkap', 'Pindai ulang kode QR pada kartu pengawasan.'); return; }
+      App.api('publik.scan', { id: id }).then(function (r) {
+        var hari = r.masaBerlaku ? Math.round((new Date(r.masaBerlaku + 'T00:00:00+08:00') - new Date(fmt.hariIni() + 'T00:00:00+08:00')) / 864e5) : null;
+        var berlaku = !r.diblokir && hari !== null && hari >= 0;
+        var v = r.diblokir ? ['lock', 'DIBLOKIR', 'Kendaraan ini sedang diblokir. Kartu pengawasan tidak berlaku sampai blokir dicabut petugas.', 'crit']
+          : berlaku ? ['verified', 'KARTU BERLAKU', 'Masa berlaku masih ' + hari + ' hari lagi.', 'ok']
+          : ['event_busy', 'KARTU TIDAK BERLAKU', hari === null ? 'Masa berlaku belum tercatat.' : 'Masa berlaku telah lewat ' + (-hari) + ' hari.', 'bad'];
+        el.innerHTML = '<div class="vonis ' + v[3] + '">' + ikon(v[0], 'fill') + '<div><h2>' + v[1] + '</h2><p>' + esc(v[2]) + '</p></div></div>' +
+          '<div class="card" style="margin-top:14px"><div class="card-b row between wrap-row">' + App.plat(r.nopol, true).replace('plate', 'plate xl') + App.badge(r.status) + '</div>' +
+          '<div class="card-b" style="padding-top:0"><dl class="dl">' +
+          '<div><dt>Nomor kartu</dt><dd class="mono">' + esc(r.nomorKartu) + '</dd></div>' +
+          '<div><dt>Pemilik</dt><dd>' + esc(r.pemilik || '-') + '</dd></div>' +
+          '<div><dt>Perusahaan</dt><dd>' + esc(r.perusahaan || '-') + '</dd></div>' +
+          '<div><dt>Trayek</dt><dd>' + esc(r.trayek || '-') + '</dd></div>' +
+          '<div><dt>Masa berlaku</dt><dd>' + fmt.tglP(r.masaBerlaku) + '</dd></div>' +
+          '<div><dt>Diperiksa</dt><dd>' + fmt.tglP(fmt.hariIni()) + '</dd></div></dl></div></div>' +
+          '<div class="note" style="margin-top:14px">' + ikon('info') + '<div class="small">Data ditampilkan langsung dari sistem SIMAU. Bila data berbeda dengan kartu fisik, laporkan lewat <a href="../#/pengaduan">Form Pengaduan</a>.</div></div>';
+      }, function (e) {
+        pesan(e.kode === 'RATE' ? 'timer' : e.kode === 'NOT_FOUND' ? 'gpp_bad' : 'wifi_off', e.kode === 'NOT_FOUND' ? 'Kartu tidak dikenal' : 'Belum dapat memeriksa', e.message, e.kode === 'NOT_FOUND' ? 'bad' : 'netral');
+      });
+    });
+  </script>
+</body>
+</html>

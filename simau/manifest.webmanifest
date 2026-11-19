@@ -1,0 +1,23 @@
+{
+  "name": "SIMAU — Sistem Informasi Manajemen Angkutan Umum",
+  "short_name": "SIMAU",
+  "description": "Pengawasan angkutan kota Bidang Sarana Transportasi, Dinas Perhubungan Kota Balikpapan.",
+  "id": "./",
+  "start_url": "./#/dashboard",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "lang": "id",
+  "background_color": "#F4F6FA",
+  "theme_color": "#0F3B67",
+  "icons": [
+    { "src": "../icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "../icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "../icons/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ],
+  "shortcuts": [
+    { "name": "Cek Kelengkapan", "url": "./#/cek" },
+    { "name": "Kartu Pengawasan", "url": "./#/kartu" },
+    { "name": "Data Kendaraan", "url": "./#/kendaraan" }
+  ]
+}

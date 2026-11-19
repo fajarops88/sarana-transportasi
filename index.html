@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Layanan Sarana Transportasi — Dinas Perhubungan Kota Balikpapan</title>
+  <meta name="description" content="Portal resmi layanan sarana transportasi Kota Balikpapan: informasi angkutan umum, pengaduan masyarakat, cek status kendaraan, surat penindakan, dan tiket pengaduan.">
+  <meta name="robots" content="index, follow">
+  <meta name="theme-color" content="#0F3B67">
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="Layanan Sarana Transportasi — Dishub Kota Balikpapan">
+  <meta property="og:description" content="Pengaduan, cek status kendaraan angkutan umum, dan informasi sarana transportasi Kota Balikpapan.">
+  <meta property="og:image" content="icons/icon-512.png">
+  <link rel="icon" href="icons/logo.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="preconnect" href="https://script.google.com">
+  <link rel="preconnect" href="https://script.googleusercontent.com">
+  <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" onload="this.onload=null;this.rel='stylesheet'">
+  <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0..1,0&display=block" onload="this.onload=null;this.rel='stylesheet'">
+  <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap"></noscript>
+  <link rel="stylesheet" href="css/app.css?v=1.0.0">
+</head>
+<body class="site">
+  <a href="#app" class="sr">Lompat ke isi</a>
+  <header class="site-h">
+    <div class="wrap">
+      <a class="brand" href="#/"><img src="icons/logo.svg" alt="Logo Dishub" width="40" height="40"><span><b id="namaDinas">DISHUB BALIKPAPAN</b><small id="namaBidang">Bidang Sarana Transportasi</small></span></a>
+      <button class="btn btn-ghost btn-icon burger" id="burger" aria-label="Buka menu" aria-expanded="false"><span class="ms">menu</span></button>
+      <nav class="nav" id="nav" aria-label="Menu utama">
+        <a href="#/" data-r="beranda">Beranda</a>
+        <div class="dd" data-r="profil"><button type="button">Profil <span class="ms">expand_more</span></button>
+          <div class="dd-m"><a href="#/profil/sejarah">Sejarah</a><a href="#/profil/visi-misi">Visi dan Misi</a><a href="#/profil/tugas-fungsi">Tugas dan Fungsi</a><a href="#/profil/struktur">Struktur Organisasi</a><a href="#/profil/kontak">Kontak</a></div></div>
+        <a href="#/berita" data-r="berita">Berita</a>
+        <a href="#/pengumuman" data-r="pengumuman">Pengumuman</a>
+        <a href="#/regulasi" data-r="regulasi">Regulasi</a>
+        <div class="dd" data-r="layanan"><button type="button">Layanan <span class="ms">expand_more</span></button>
+          <div class="dd-m"><a href="#/pengaduan">Pengaduan</a><a href="#/cek">Cek Status</a><a href="#/survei">Survei Layanan</a></div></div>
+        <a href="#/statistik" data-r="statistik">Statistik</a>
+      </nav>
+    </div>
+  </header>
+  <div class="ticker" id="ticker"><div class="wrap"><span class="pill">PENGUMUMAN</span><span class="txt muted">Memuat…</span></div></div>
+  <main id="app">
+    <section class="hero"><div class="wrap"><div><div class="eyebrow">Pelayanan publik transportasi</div><h1>Layanan Sarana Transportasi Kota Balikpapan</h1><p>Pengaduan, cek status kendaraan angkutan umum, dan informasi sarana transportasi dalam satu pintu.</p></div><div class="pejabat"><div class="sk sk-line"></div><div class="sk sk-line"></div></div></div></section>
+  </main>
+  <footer class="site-f" id="footer">
+    <div class="wrap">
+      <div class="cols">
+        <div><div class="row" style="margin-bottom:12px"><img src="icons/logo.svg" alt="" width="36" height="36"><b style="color:#fff">DISHUB BALIKPAPAN</b></div>
+          <p class="small" id="fAlamat">Dinas Perhubungan Kota Balikpapan</p><p class="small" id="fJam"></p></div>
+        <div><h4>Kontak &amp; Lokasi</h4><ul><li id="fTelp"></li><li id="fEmail"></li></ul><div class="row wrap-row" style="margin-top:10px"><a class="btn btn-sm btn-wa hide" id="fWa" target="_blank" rel="noopener"><span class="ms">chat</span>WhatsApp</a><a class="small hide" id="fPeta" target="_blank" rel="noopener"><span class="ms">map</span> Lihat lokasi di peta</a></div></div>
+        <div><h4>Navigasi</h4><ul><li><a href="#/">Beranda</a></li><li><a href="#/profil/sejarah">Profil</a></li><li><a href="#/regulasi">Regulasi</a></li><li><a href="#/statistik">Statistik</a></li></ul></div>
+        <div><h4>Layanan</h4><ul><li><a href="#/pengaduan">Buat Pengaduan</a></li><li><a href="#/cek">Cek Status</a></li><li><a href="#/survei">Survei Layanan</a></li></ul>
+          <a class="btn btn-sm btn-white" href="#/masuk" style="margin-top:12px"><span class="ms">login</span>Masuk Petugas</a></div>
+      </div>
+      <div class="bawah"><span>© <span id="thn">2026</span> Dinas Perhubungan Kota Balikpapan</span><span class="mono">PORTAL RESMI v<span id="ver">1.0.0</span></span></div>
+    </div>
+  </footer>
+  <script src="js/config.js?v=1.0.0" defer></script>
+  <script src="js/versi.js?v=1.0.0" defer></script>
+  <script src="js/core.js?v=1.0.0" defer></script>
+  <script src="js/ui.js?v=1.0.0" defer></script>
+  <script src="js/landing.js?v=1.0.0" defer></script>
+</body>
+</html>
