@@ -1,6 +1,7 @@
 /**
  * simau.js — Modul B: SIMAU (Superadmin, Admin Angkutan, Petugas Angkutan).
- * Data induk (trayek, perusahaan, kendaraan), cek kelengkapan 15 item, kartu pengawasan (syarat terbit
+ * Data induk (trayek, perusahaan, kendaraan), cek kelengkapan 15 item (1 checklist bernomor tetap per kendaraan
+ * + riwayat setiap pemeriksaan), kartu pengawasan (syarat terbit
  * terintegrasi ETLE), riwayat, sanksi 5 tingkat, izin insidentil, fasilitas halte + peta, pengaduan,
  * 7 laporan siap cetak, kelola akun Petugas Angkutan.
  * Kecepatan: daftar kendaraan + data induk dibaca sekali (swr), menu lain dipanaskan lewat batch saat senggang.
@@ -195,7 +196,7 @@
           (k.blokir ? '<div class="note crit">' + ikon('lock') + '<div><b>Diblokir.</b> ' + (k.blokirSanksi ? k.blokirSanksi + ' sanksi pemblokir aktif. ' : '') + (k.blokirEtle.length ? 'Kasus ETLE terbuka: ' + k.blokirEtle.map(esc).join(', ') + '.' : '') + '</div></div>' : '') +
           '<div class="dl"><div><dt>Trayek</dt><dd>' + esc((k.kodeTrayek ? k.kodeTrayek + ' — ' : '') + k.trayek) + '</dd></div><div><dt>Perusahaan</dt><dd>' + esc(k.perusahaan || '-') + '</dd></div>' +
           '<div><dt>Pemilik</dt><dd>' + esc(k.pemilik || '-') + '<div class="small muted">' + esc(k.alamat || '') + '</div></dd></div><div><dt>Tahun / usia</dt><dd>' + esc(k.tahun || '-') + (k.usia !== null ? ' (' + k.usia + ' tahun)' : '') + '</dd></div>' +
-          '<div><dt>Masa berlaku</dt><dd>' + fmt.tglP(k.masaBerlaku) + '<div>' + sisa(k) + '</div></dd></div><div><dt>Kelengkapan terakhir</dt><dd>' + persen(k.kelengkapan) + (k.tglCek ? '<div class="tiny muted">' + fmt.tglJam(k.tglCek) + '</div>' : '') + '</dd></div></div>' +
+          '<div><dt>Masa berlaku</dt><dd>' + fmt.tglP(k.masaBerlaku) + '<div>' + sisa(k) + '</div></dd></div><div><dt>Kelengkapan terakhir</dt><dd>' + persen(k.kelengkapan) + (k.tglCek ? '<div class="tiny muted">' + fmt.tglJam(k.tglCek) + '</div>' : '') + (k.idCek ? '<div class="tiny muted"><span class="mono">' + esc(k.idCek) + '</span> · ' + k.jumlahCek + '× diperiksa</div>' : '') + '</dd></div></div>' +
           '<div class="grid g2" style="gap:8px">' + [['#/cek?id=' + k.id, 'fact_check', 'Cek kelengkapan'], ['#/kartu?id=' + k.id, 'badge', 'Kartu pengawasan'], ['#/riwayat?id=' + k.id, 'history', 'Riwayat'], ['#/sanksi?id=' + k.id, 'gavel', 'Catat sanksi'], ['#/insidentil?id=' + k.id, 'event_available', 'Izin insidentil']].map(function (x) {
             return '<a class="btn btn-outline" href="' + x[0] + '" data-tutup-laci>' + ikon(x[1]) + x[2] + '</a>';
           }).join('') + '</div><div class="tiny muted">ID ' + esc(k.id) + ' · diinput ' + fmt.tglJam(k.input) + '</div></div>',
@@ -225,15 +226,24 @@
       '<text x="65" y="66" text-anchor="middle" style="font-size:26px;font-weight:700;fill:var(--ink)">' + (Math.round(p * 10) / 10) + '%</text></svg>';
   }
   function cek(el, args, q) {
-    var pilih = null, hidup = Shell.hidup();
-    el.innerHTML = Shell.judul(el, { eyebrow: 'Pemeriksaan', h: 'Cek Kelengkapan Angkutan Kota', p: 'Item dihitung lengkap bila <b>Ada</b> DAN <b>Baik</b>. Kartu pengawasan hanya dapat terbit bila kelengkapan terbaru ≥ 50%.' }) +
+    var hidup = Shell.hidup(), CEKS = [], pilih = null, tersimpan = false;
+    el.innerHTML = Shell.judul(el, { eyebrow: 'Pemeriksaan', h: 'Cek Kelengkapan Angkutan Kota', p: 'Setiap kendaraan punya <b>satu checklist bernomor tetap</b>; setiap pemeriksaan tercatat di riwayatnya. Item lengkap bila <b>Ada</b> DAN <b>Baik</b>. Kartu pengawasan hanya terbit bila kelengkapan terakhir ≥ 50%.' }) +
       '<div class="card card-b" id="pil"></div><div id="isiCek" style="margin-top:16px"></div>' +
-      '<div class="card" style="margin-top:20px"><div class="card-h"><h3>' + ikon('history') + 'Riwayat pemeriksaan</h3></div><div id="tCek">' + UI.sk.baris(5) + '</div></div>';
+      '<div class="card" style="margin-top:20px"><div class="card-h"><h3>' + ikon('fact_check') + 'Checklist kendaraan</h3><span class="tiny muted">1 baris per kendaraan · klik baris untuk riwayat pemeriksaan</span></div><div id="tCek">' + UI.sk.baris(5) + '</div></div>';
+    function milik(idK) { return CEKS.filter(function (c) { return c.idKendaraan === idK; })[0]; }
+    function infoChecklist(k) {
+      var c = milik(k.id), w = $('#infoCk'), b = $('#salinAkhir');
+      if (!w) return;
+      w.innerHTML = c && c.jumlah ? ikon('fact_check') + '<div class="small">Checklist <b class="mono">' + esc(c.id) + '</b> · sudah diperiksa <b>' + c.jumlah + '×</b> · terakhir ' + fmt.tglJam(c.tanggal) + ' (' + persen(c.persen) + '). Pemeriksaan ini akan tercatat sebagai <b>ke-' + (c.jumlah + 1) + '</b> dengan nomor checklist yang sama.</div>'
+        : c ? ikon('fact_check') + '<div class="small">Checklist <b class="mono">' + esc(c.id) + '</b> · belum ada pemeriksaan tersimpan. Nomor ini tetap milik kendaraan ini.</div>'
+        : ikon('add_task') + '<div class="small">Kendaraan ini belum punya checklist. Nomornya dibuat saat pemeriksaan pertama disimpan dan <b>tidak berubah</b> pada pemeriksaan berikutnya.</div>';
+      if (b) b.classList.toggle('hide', !(c && c.jumlah));
+    }
     function formCek(k) {
-      pilih = k;
+      pilih = k; tersimpan = false;
       var L = B.perlengkapan, ambang = B.ambang;
-      $('#isiCek').innerHTML = '<div class="grid" style="grid-template-columns:minmax(0,1fr) 320px;gap:16px;align-items:start" id="gridCek"><form class="card" id="fCek"><div class="card-h"><div><h3>15 komponen kelengkapan</h3><div class="tiny muted">' + App.plat(k.nopol, true) + ' ' + esc(k.trayek || '') + '</div></div>' +
-        '<div class="row"><button type="button" class="btn btn-outline btn-sm" id="semua">' + ikon('done_all') + 'Semua Ada & Baik</button><button type="button" class="btn btn-ghost btn-sm" id="reset">Kosongkan</button></div></div>' +
+      $('#isiCek').innerHTML = '<div class="note" id="infoCk" style="margin-bottom:12px"></div><div class="grid" style="grid-template-columns:minmax(0,1fr) 320px;gap:16px;align-items:start" id="gridCek"><form class="card" id="fCek"><div class="card-h" style="flex-wrap:wrap;gap:8px"><div><h3>15 komponen kelengkapan</h3><div class="tiny muted">' + App.plat(k.nopol, true) + ' ' + esc(k.trayek || '') + '</div></div>' +
+        '<div class="row wrap-row"><button type="button" class="btn btn-ghost btn-sm hide" id="salinAkhir" title="Isi formulir dengan hasil pemeriksaan terakhir, lalu ubah yang berbeda">' + ikon('content_copy') + 'Salin cek terakhir</button><button type="button" class="btn btn-outline btn-sm" id="semua">' + ikon('done_all') + 'Semua Ada & Baik</button><button type="button" class="btn btn-ghost btn-sm" id="reset">Kosongkan</button></div></div>' +
         L.map(function (p, i) {
           return '<div class="row wrap-row" data-k="' + p.k + '" style="padding:12px 18px;border-bottom:1px solid var(--line)"><span class="badge b-slate mono" style="min-width:30px;justify-content:center">' + (i + 1) + '</span><div class="grow" style="min-width:200px"><b class="small">' + esc(p.l) + '</b></div>' +
             '<div class="seg ok"><label><input type="radio" name="' + p.k + '_k" value="Ada">Ada</label><label><input type="radio" name="' + p.k + '_k" value="Tidak">Tidak</label></div>' +
@@ -244,6 +254,7 @@
         '<div class="card card-b stack"><div class="dl"><div><dt>Petugas pemeriksa</dt><dd>' + esc(me.nama || me.email) + '</dd></div><div><dt>Tanggal</dt><dd>' + fmt.tglP(fmt.hariIni()) + '</dd></div></div>' +
         '<button class="btn btn-primary btn-block" id="simpanCek">' + ikon('save') + 'Simpan pemeriksaan</button><a class="btn btn-amber btn-block hide" id="keKartu" href="#/kartu?id=' + k.id + '">' + ikon('badge') + 'Lanjut ke kartu pengawasan</a></div></div></div>';
       if (window.innerWidth < 1100) $('#gridCek').style.gridTemplateColumns = 'minmax(0,1fr)';
+      infoChecklist(k);
       var f = $('#fCek');
       function hitung() {
         var n = 0, isi = 0;
@@ -253,7 +264,7 @@
           $$('input[name="' + p.k + '_c"]', f).forEach(function (x) { x.disabled = a === 'Tidak'; x.closest('label').style.opacity = a === 'Tidak' ? '.4' : ''; });
           if (a === 'Tidak' && c) $$('input[name="' + p.k + '_c"]', f).forEach(function (x) { x.checked = false; });
           var ok = a === 'Ada' && f[p.k + '_c'].value === 'Baik'; if (ok) n++;
-          baris.style.background = ok ? 'var(--ok-bg)' : a ? '' : '';
+          baris.style.background = ok ? 'var(--ok-bg)' : '';
         });
         var pr = Math.round(n / L.length * 1000) / 10;
         $('#ring').innerHTML = cincin(pr, ambang);
@@ -264,40 +275,87 @@
       f.addEventListener('change', hitung);
       $('#semua').onclick = function () { L.forEach(function (p) { f[p.k + '_k'].value = 'Ada'; f[p.k + '_c'].value = 'Baik'; }); hitung(); };
       $('#reset').onclick = function () { $$('input[type=radio]', f).forEach(function (x) { x.checked = false; }); hitung(); };
+      $('#salinAkhir').onclick = function () {
+        var c = milik(k.id); if (!c) return;
+        $$('input[type=radio]', f).forEach(function (x) { x.checked = false; });
+        L.forEach(function (p) { var v = c.item[p.k] || []; if (v[0]) f[p.k + '_k'].value = v[0]; if (v[1]) f[p.k + '_c'].value = v[1]; });
+        hitung(); App.toast('Formulir diisi dari pemeriksaan ' + fmt.tgl(c.tanggal) + '. Ubah item yang berbeda sebelum menyimpan.', 'ok');
+      };
       hitung();
       $('#simpanCek').onclick = function () {
         var item = {}, kosong = 0;
         L.forEach(function (p) { var a = f[p.k + '_k'].value, c = f[p.k + '_c'].value; if (!a) kosong++; item[p.k] = [a, a === 'Ada' ? c : '']; });
         var go = function () {
           UI.Form.muat($('#simpanCek'), App.api('simau.cek.simpan', { idKendaraan: k.id, item: item })).then(function (r) {
-            App.toast('Pemeriksaan tersimpan: ' + r.persen + '%.', r.lolos ? 'ok' : 'warn');
-            $('#simpanCek').disabled = true; $('#simpanCek').innerHTML = ikon('task_alt') + 'Tersimpan (' + r.persen + '%)';
+            tersimpan = true;
+            App.toast('Pemeriksaan ke-' + r.ke + ' tersimpan di checklist ' + r.id + ': ' + r.persen + '%.', r.lolos ? 'ok' : 'warn');
+            $('#simpanCek').disabled = true; $('#simpanCek').innerHTML = ikon('task_alt') + 'Tersimpan · ' + esc(r.id) + ' ke-' + r.ke + ' (' + r.persen + '%)';
+            $('#infoCk').innerHTML = ikon('task_alt') + '<div class="small">Tersimpan sebagai <b>pemeriksaan ke-' + r.ke + '</b> di checklist <b class="mono">' + esc(r.id) + '</b>' + (r.baru ? ' (checklist baru untuk kendaraan ini)' : '') + '.</div>';
             if (r.lolos) $('#keKartu').classList.remove('hide');
-            k.kelengkapan = r.persen; bump(); muatRiwayat(true);
+            k.kelengkapan = r.persen; bump(); muatDaftar(true);
           }, function (e) { App.toast(e.message, 'bad'); });
         };
         if (kosong) UI.Modal.konfirm(kosong + ' item belum diisi dan akan dihitung tidak lengkap. Simpan sekarang?', { ok: 'Simpan' }).then(function (ok) { if (ok) go(); }); else go();
       };
     }
     var tbl = null;
-    function muatRiwayat(fresh) {
+    function muatDaftar(fresh) {
       return App.swr('simau.cek.list', {}, { maxAge: 30000, fresh: fresh, onData: function (d) {
         if (!hidup()) return;
-        if (!tbl) tbl = UI.Tabel($('#tCek'), { cari: 'Cari nopol atau petugas…', perHal: 10, data: d,
-          kolom: [{ k: 'tanggal', l: 'Tanggal', f: function (r) { return fmt.tglJam(r.tanggal); } }, { k: 'nopol', l: 'Nopol', f: function (r) { return App.plat(r.nopol, true) + (r.ada ? '' : ' <span class="badge b-slate">kendaraan dihapus</span>'); } },
-            { k: 'persen', l: 'Kelengkapan', cls: 'right', f: function (r) { return persen(r.persen); } }, { k: 'petugas', l: 'Petugas', f: function (r) { return '<span class="small">' + esc(r.petugas) + '</span>'; } },
-            { l: '', cls: 'aksi', sort: false, f: function () { return ADM.indexOf(me.role) > -1 ? '<button class="btn btn-ghost btn-icon btn-sm" data-aksi="hapus" title="Hapus" style="color:var(--bad)">' + ikon('delete') + '</button>' : ''; } }],
-          onRow: lihat, onAksi: function (a, r) { if (a === 'hapus') UI.Modal.konfirm('Hapus pemeriksaan ' + esc(r.nopol) + ' tanggal ' + fmt.tgl(r.tanggal) + '?', { ok: 'Hapus', bahaya: true }).then(function (ok) { if (ok) App.api('simau.cek.hapus', { id: r.id }).then(function () { App.toast('Dihapus.', 'ok'); muatRiwayat(true); bump(); }, function (e) { App.toast(e.message, 'bad'); }); }); },
-          kosong: { ikon: 'fact_check', judul: 'Belum ada pemeriksaan' } });
+        CEKS = d; if (pilih && !tersimpan) infoChecklist(pilih);
+        if (!tbl) tbl = UI.Tabel($('#tCek'), { cari: 'Cari nomor checklist, nopol, atau petugas…', perHal: 10, data: d,
+          kolom: [{ k: 'id', l: 'No. checklist', f: function (r) { return '<b class="mono">' + esc(r.id) + '</b>'; } },
+            { k: 'nopol', l: 'Nopol', f: function (r) { return App.plat(r.nopol, true) + (r.ada ? '' : ' <span class="badge b-slate">kendaraan dihapus</span>'); } },
+            { k: 'persen', l: 'Kelengkapan terakhir', cls: 'right', f: function (r) { return persen(r.persen); } },
+            { k: 'tanggal', l: 'Pemeriksaan terakhir', f: function (r) { return r.tanggal ? fmt.tglJam(r.tanggal) : '<span class="muted">—</span>'; } },
+            { k: 'jumlah', l: 'Diperiksa', cls: 'right', f: function (r) { return '<span class="mono">' + r.jumlah + '×</span>'; } },
+            { k: 'petugas', l: 'Petugas terakhir', f: function (r) { return '<span class="small">' + esc(r.petugas || '-') + '</span>'; } }],
+          onRow: lihat, kosong: { ikon: 'fact_check', judul: 'Belum ada checklist' } });
         else tbl.setData(d);
       } }).catch(function (e) { $('#tCek').innerHTML = galat(e); });
     }
+    function tabelItem(item) {
+      return '<table class="tbl" style="margin-top:8px"><thead><tr><th>#</th><th>Komponen</th><th>Keberadaan</th><th>Kondisi</th></tr></thead><tbody>' +
+        (B ? B.perlengkapan : []).map(function (p, i) { var v = item[p.k] || []; return '<tr><td class="mono">' + (i + 1) + '</td><td>' + esc(p.l) + '</td><td>' + (v[0] ? App.badge(v[0] === 'Ada' ? 'Ada' : 'Tidak', v[0] === 'Ada' ? 'b-ok' : 'b-bad') : '—') + '</td><td>' + (v[1] ? App.badge(v[1], v[1] === 'Baik' ? 'b-ok' : 'b-bad') : '—') + '</td></tr>'; }).join('') + '</tbody></table>';
+    }
+    /** Riwayat satu checklist: setiap pemeriksaan dengan tanggal, hasil, petugas; rincian & hapus per pemeriksaan. */
     function lihat(r) {
-      UI.Modal.buka({ judul: 'Pemeriksaan ' + r.nopol, lebar: 'lebar', isi: '<div class="row" style="margin-bottom:12px">' + persen(r.persen) + '<span class="small muted">' + fmt.tglJam(r.tanggal) + ' · ' + esc(r.petugas) + '</span></div><table class="tbl"><thead><tr><th>#</th><th>Komponen</th><th>Keberadaan</th><th>Kondisi</th></tr></thead><tbody>' +
-        B.perlengkapan.map(function (p, i) { var v = r.item[p.k] || []; return '<tr><td class="mono">' + (i + 1) + '</td><td>' + esc(p.l) + '</td><td>' + (v[0] ? App.badge(v[0] === 'Ada' ? 'Ada' : 'Tidak', v[0] === 'Ada' ? 'b-ok' : 'b-bad') : '—') + '</td><td>' + (v[1] ? App.badge(v[1], v[1] === 'Baik' ? 'b-ok' : 'b-bad') : '—') + '</td></tr>'; }).join('') + '</tbody></table>', tombol: [{ l: 'Tutup', cls: 'btn-primary' }] });
+      var adm = ADM.indexOf(me.role) > -1;
+      var m = UI.Modal.buka({ judul: 'Checklist ' + r.id + ' · ' + r.nopol, lebar: 'lebar',
+        isi: '<div class="row wrap-row" style="margin-bottom:12px">' + App.plat(r.nopol, true) + persen(r.persen) + '<span class="small muted" id="ringkasCk">' + r.jumlah + '× diperiksa' + (r.pertama ? ' · pertama ' + fmt.tgl(r.pertama) : '') + '</span></div><div id="rwCk">' + UI.sk.baris(4) + '</div>',
+        tombol: (r.ada ? [{ l: 'Periksa lagi', cls: 'btn-outline', aksi: function () { location.hash = '#/cek?id=' + encodeURIComponent(r.idKendaraan); } }] : []).concat([{ l: 'Tutup', cls: 'btn-primary' }]) });
+      function muat(fresh) {
+        App.swr('simau.cek.riwayat', { id: r.id }, { maxAge: 0, fresh: fresh, onData: function (d) {
+          var w = $('#rwCk', m.el); if (!w) return;
+          var rs = $('#ringkasCk', m.el); if (rs) rs.textContent = d.riwayat.length + '× diperiksa' + (d.checklist && d.checklist.pertama ? ' · pertama ' + fmt.tgl(d.checklist.pertama) : '');
+          if (!d.riwayat.length) { w.innerHTML = '<div class="kosong">' + ikon('history') + '<h4>Belum ada pemeriksaan</h4><p class="small muted">Nomor ' + esc(r.id) + ' tetap milik kendaraan ini.</p></div>'; return; }
+          w.innerHTML = '<div class="tl">' + d.riwayat.map(function (x, i) {
+            return '<div class="tl-i' + (i === 0 ? ' on' : '') + '"><span class="dot">' + ikon('fact_check') + '</span>' +
+              '<div class="row between wrap-row"><b>Pemeriksaan ke-' + x.ke + (i === 0 ? ' <span class="badge b-ok">terakhir</span>' : '') + '</b><span class="small muted">' + fmt.tglJam(x.tanggal) + '</span></div>' +
+              '<div class="row wrap-row small" style="gap:8px">' + persen(x.persen) + '<span class="muted grow">' + esc(x.petugas || '-') + (x.idLama ? ' · ID lama ' + esc(x.idLama) : '') + '</span>' +
+              '<button class="btn btn-ghost btn-sm" data-rinci="' + i + '">' + ikon('list') + 'Rincian</button>' +
+              (adm ? '<button class="btn btn-ghost btn-sm" data-hapus="' + i + '" style="color:var(--bad)" title="Hapus pemeriksaan ini dari riwayat">' + ikon('delete') + '</button>' : '') + '</div>' +
+              (x.catatan ? '<div class="tiny muted">' + esc(x.catatan) + '</div>' : '') + '<div data-isi="' + i + '"></div></div>';
+          }).join('') + '</div>';
+          $$('[data-rinci]', w).forEach(function (b) { b.onclick = function () { var i = +b.getAttribute('data-rinci'), wadah = $('[data-isi="' + i + '"]', w); wadah.innerHTML = wadah.innerHTML ? '' : tabelItem(d.riwayat[i].item); }; });
+          $$('[data-hapus]', w).forEach(function (b) {
+            b.onclick = function () {
+              var x = d.riwayat[+b.getAttribute('data-hapus')];
+              UI.Modal.konfirm('Hapus pemeriksaan ke-' + x.ke + ' (' + fmt.tglJam(x.tanggal) + ') dari riwayat ' + esc(r.id) + '? Nomor checklist tetap; isi checklist kembali ke pemeriksaan terakhir yang tersisa.', { ok: 'Hapus', bahaya: true }).then(function (ok) {
+                if (!ok) return;
+                App.api('simau.cek.hapus', { id: x.id }).then(function (h) {
+                  App.toast(h.sisa ? 'Pemeriksaan dihapus. ' + h.idCek + ' kini berisi pemeriksaan terakhir yang tersisa.' : 'Pemeriksaan dihapus. ' + h.idCek + ' kosong; nomornya tetap.', 'ok');
+                  muat(true); muatDaftar(true); bump();
+                }, function (e) { App.toast(e.message, 'bad'); });
+              });
+            };
+          });
+        } }).catch(function (e) { var w = $('#rwCk', m.el); if (w) w.innerHTML = galat(e); });
+      }
+      muat();
     }
     siap(function () { pemilih($('#pil'), { idAwal: q.get('id'), onPilih: formCek, label: 'Kendaraan yang diperiksa' }); }).catch(function (e) { $('#pil').innerHTML = galat(e); });
-    muatRiwayat();
+    muatDaftar();
   }
 
   // ================================================================== KARTU PENGAWASAN
@@ -351,7 +409,7 @@
     function tampil(k) {
       $('#isiR').innerHTML = '<div class="card">' + UI.sk.baris(8) + '</div>';
       var hidup = Shell.hidup();
-      App.swr('simau.riwayat', { id: k.id }, { maxAge: 30000, onData: function (d) {
+      App.swr('simau.riwayat', { id: k.id }, { maxAge: 0, onData: function (d) {
         if (!hidup()) return;
         var x = d.kendaraan;
         $('#isiR').innerHTML = '<div class="card card-b row wrap-row">' + App.plat(x.nopol, true).replace('plate', 'plate xl') + '<div class="grow"><b>' + esc(x.trayek || '-') + '</b><div class="small muted">' + esc(x.pemilik || '') + ' · ' + esc(x.perusahaan || '') + '</div></div>' + statusK(x) + '<a class="btn btn-outline btn-sm" href="#/kartu?id=' + x.id + '">' + ikon('badge') + 'Kartu</a></div>' +
@@ -558,7 +616,7 @@
         kolom = ['No', 'Kode', 'Trayek', 'Jumlah', 'Aktif', 'Tidak Aktif']; baris = d.baris.map(function (r, i) { return [i + 1, r.kode, r.nama, r.total, r.aktif, r.tidakAktif]; }); kaki = ['', '', 'JUMLAH', d.jumlah.total, d.jumlah.aktif, d.jumlah.tidakAktif];
       } else if (jenis === 'cek') {
         judul = 'LAPORAN KELENGKAPAN KENDARAAN ANGKUTAN KOTA'; sub = 'Pemeriksaan terakhir tiap kendaraan · ambang ' + d.ambang + '% (Ada DAN Baik)';
-        kolom = ['No', 'Nomor Polisi', 'Trayek', 'Tanggal Cek', 'Kelengkapan', 'Hasil', 'Petugas']; baris = d.baris.map(function (r, i) { return [i + 1, r.nopol, r.trayek, r.tanggal || 'belum dicek', r.persen === null ? '-' : r.persen + '%', r.persen === null ? '-' : r.lolos ? 'Memenuhi' : 'Tidak memenuhi', r.petugas]; });
+        kolom = ['No', 'No. Checklist', 'Nomor Polisi', 'Trayek', 'Cek Terakhir', 'Jml Cek', 'Kelengkapan', 'Hasil', 'Petugas']; baris = d.baris.map(function (r, i) { return [i + 1, r.idCek || '-', r.nopol, r.trayek, r.tanggal || 'belum dicek', r.jumlah || '-', r.persen === null ? '-' : r.persen + '%', r.persen === null ? '-' : r.lolos ? 'Memenuhi' : 'Tidak memenuhi', r.petugas]; });
         tambahan = '<h4 style="margin:14px 0 6px;font-size:13px">Rekap per komponen</h4>' + tabel(['Komponen', 'Diperiksa', 'Ada', 'Ada & Baik', '% Ada & Baik'], d.perItem.map(function (x) { return [x.l, x.diperiksa, x.ada, x.adaBaik, x.diperiksa ? Math.round(x.adaBaik / x.diperiksa * 100) + '%' : '-']; }));
       } else if (jenis === 'halte') {
         judul = 'LAPORAN FASILITAS HALTE'; kolom = ['No', 'Halte'].concat(d.fasilitas.map(function (f) { return f.l; })).concat(['Baik']);
