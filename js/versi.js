@@ -1,6 +1,14 @@
 /* Versi aplikasi — WAJIB sama dengan sw.js (simau & etle), backend/Config.gs APP.versi, dan CHANGELOG.md */
-window.APP_VERSI = '1.3.1';
+window.APP_VERSI = '1.3.2';
 window.RIWAYAT_VERSI = [
+  { v: '1.3.2', tgl: '2026-11-20', isi: [
+    '[Website] Halaman depan lebih cepat: judul utama tidak digambar ulang, tampilan tidak bergeser saat data dimuat',
+    '[Website] Fon teks dan ikon dimuat dari situs sendiri; fon ikon situs publik diringkas (±11 KB, sebelumnya ratusan KB dari Google)',
+    '[Website] Kartu Sambutan bertinggi tetap: kutipan maksimal 4 baris, tautan "Baca lengkap"',
+    '[Aksesibilitas] Kontras teks abu-abu, tombol Pasang di footer, urutan judul, label isian formulir & tombol tutup',
+    '[Website] Data, pemanasan server & Service Worker dimuat setelah tampilan pertama',
+    '[Semua] Kerangka muat memakai denyut ringan; animasi dimatikan bila perangkat diatur "kurangi gerakan"'
+  ] },
   { v: '1.3.1', tgl: '2026-11-20', isi: [
     '[ETLE] Superadmin & Admin ETLE: tombol Hapus draf di Detail Kasus panel admin',
     '[ETLE] Saringan "Draf terbengkalai" (≥ 3/7/14/30 hari tidak diubah) di Semua Kasus, centang lalu hapus beberapa sekaligus',

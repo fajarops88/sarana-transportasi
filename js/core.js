@@ -26,13 +26,14 @@
   var BLN_P = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
   function tglObj(s) { if (!s) return null; s = String(s); var d = new Date(/^\d{4}-\d{2}-\d{2}$/.test(s) ? s + 'T00:00:00+08:00' : s); return isNaN(d) ? null : d; }
   function wita(d) { return new Date(d.getTime() + (8 * 60 + d.getTimezoneOffset()) * 60000); }
+  var NF_ID = (typeof Intl !== 'undefined' && Intl.NumberFormat) ? new Intl.NumberFormat('id-ID') : null;
   var fmt = {
     tgl: function (s) { var d = tglObj(s); if (!d) return s ? esc(s) : '—'; d = wita(d); return d.getDate() + ' ' + BLN[d.getMonth()] + ' ' + d.getFullYear(); },
     tglP: function (s) { var d = tglObj(s); if (!d) return '—'; d = wita(d); return d.getDate() + ' ' + BLN_P[d.getMonth()] + ' ' + d.getFullYear(); },
     jam: function (s) { var d = tglObj(s); if (!d) return ''; d = wita(d); return String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0') + ' WITA'; },
     tglJam: function (s) { return s && String(s).length > 10 ? fmt.tgl(s) + ', ' + fmt.jam(s) : fmt.tgl(s); },
     bulan: function (ym) { var p = String(ym).split('-'); return BLN[Number(p[1]) - 1] + ' ' + String(p[0]).slice(2); },
-    angka: function (n) { return Number(n || 0).toLocaleString('id-ID'); },
+    angka: function (n) { return NF_ID ? NF_ID.format(Number(n || 0)) : Number(n || 0).toLocaleString('id-ID'); },   // satu pemformat dipakai ulang (toLocaleString membuat baru tiap panggilan)
     hariIni: function () { var d = wita(new Date()); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); },
     relatif: function (s) {
       var d = tglObj(s); if (!d) return ''; var m = Math.round((Date.now() - d.getTime()) / 60000);
@@ -415,15 +416,34 @@
     var k = 'pasang_tutup_' + (opsi.kunci || location.pathname);
     try { if (Number(localStorage.getItem(k) || 0) > Date.now()) { el.innerHTML = ''; return; } } catch (e) {}
     el.innerHTML = '<div class="pasang-kartu"><img src="' + ROOT + 'icons/icon-192.png?v=' + VERSI + '" alt="" width="44" height="44"><div class="grow"><b>Pasang aplikasi ' + esc(Pasang.nama()) + '</b><small>' + esc(opsi.teks || 'Buka langsung dari layar utama HP, tanpa mengetik alamat.') + '</small></div>' +
-      '<button type="button" class="btn btn-amber btn-sm" data-pasang>' + ikon('install_mobile') + 'Pasang</button><button type="button" class="x" data-tutup aria-label="Tutup">' + ikon('close') + '</button></div>';
+      '<button type="button" class="btn btn-amber btn-sm" data-pasang>' + ikon('install_mobile') + 'Pasang</button><button type="button" class="x" data-tutup title="Tutup">' + ikon('close') + '<span class="sr">Tutup</span></button></div>';
     el.querySelector('[data-pasang]').onclick = function () { Pasang.mulai(); };
     el.querySelector('[data-tutup]').onclick = function () { try { localStorage.setItem(k, String(Date.now() + 14 * 864e5)); } catch (e) {} el.innerHTML = ''; };
     document.addEventListener('terpasang', function () { el.innerHTML = ''; }, { once: true });
   };
+  /**
+   * Hubungkan <label> dengan isian di dalam .field yang sama (for/id) agar pembaca layar & agen AI tahu nama isian.
+   * Formulir dibuat dari string HTML tanpa id; fungsi ini melengkapinya. Aman dipanggil berulang.
+   */
+  var labelSeq = 0;
+  function labelOtomatis(root) {
+    (root || document).querySelectorAll('.field > label:not([for])').forEach(function (lb) {
+      if (lb.querySelector('input, select, textarea')) return;
+      var c = lb.parentNode.querySelectorAll('input:not([type=hidden]):not([type=radio]):not([type=checkbox]), select, textarea');
+      if (c.length !== 1) return;
+      if (!c[0].id) c[0].id = 'isian-' + (++labelSeq);
+      lb.htmlFor = c[0].id;
+    });
+  }
+
   function daftarSW(path) {
     if (!('serviceWorker' in navigator)) return;
     if (location.protocol !== 'https:' && location.hostname !== 'localhost') return;
-    navigator.serviceWorker.register(path).catch(function () {});
+    // Didaftarkan setelah halaman selesai dimuat (+ waktu senggang): pemasangan SW mengunduh belasan aset cadangan,
+    // jangan sampai berebut jaringan/CPU dengan tampilan pertama.
+    var daftar = function () { navigator.serviceWorker.register(path).catch(function () {}); };
+    var nanti = function () { if (window.requestIdleCallback) requestIdleCallback(daftar, { timeout: 3000 }); else setTimeout(daftar, 1000); };
+    if (document.readyState === 'complete') nanti(); else window.addEventListener('load', nanti, { once: true });
   }
 
   // ------------------------------------------------------------------ ekspor global
@@ -431,7 +451,7 @@
     ROOT: ROOT, VERSI: VERSI, CFG: CFG,
     esc: esc, $: $, $$: $$, fmt: fmt, plat: plat, badge: badge, ikon: ikon, debounce: debounce, hashStr: hashStr, q: q,
     toast: toast, Sesi: Sesi, Perf: Perf, Versi: Versi, api: api, apiQ: apiQ, swr: swr, Simpan: Simpan,
-    warmUp: warmUp, kompres: kompres, bacaBerkas: bacaBerkas, Xlsx: Xlsx, Pasang: Pasang, daftarSW: daftarSW, Logo: Logo
+    warmUp: warmUp, kompres: kompres, bacaBerkas: bacaBerkas, Xlsx: Xlsx, Pasang: Pasang, daftarSW: daftarSW, Logo: Logo, labelOtomatis: labelOtomatis
   };
   window.Perf = Perf;
   // logo unggahan dipasang sejak awal dan pada setiap elemen yang ditambahkan kemudian (header, menu, kop)
