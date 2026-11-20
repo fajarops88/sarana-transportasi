@@ -69,8 +69,9 @@
   // ================================================================== DASHBOARD
   function dashboard(el) {
     var hidup = Shell.hidup();
+    setTimeout(function () { App.Pasang.kartu($('#pasangK'), { kunci: 'simau', hpSaja: true, teks: 'Buka SIMAU langsung dari layar utama HP saat pemeriksaan di lapangan.' }); }, 0);
     el.innerHTML = Shell.judul(el, { eyebrow: 'Ringkasan', h: 'Dashboard Pengawasan', p: 'Kondisi angkutan kota hari ini. Status aktif dihitung dari masa berlaku; blokir dari sanksi SIMAU atau kasus ETLE terbuka.', aksi: '<a class="btn btn-primary" href="#/kendaraan?baru=1">' + ikon('add') + 'Tambah Kendaraan</a><a class="btn btn-amber" href="#/cek">' + ikon('fact_check') + 'Cek Kelengkapan</a>' }) +
-      '<div class="grid g4" id="kpi">' + UI.sk.kartu(4) + '</div>' +
+      '<div id="pasangK"></div><div class="grid g4" id="kpi">' + UI.sk.kartu(4) + '</div>' +
       '<div class="grid g2" style="margin-top:16px"><div class="card"><div class="card-h"><h3>' + ikon('event') + 'Masa berlaku kartu</h3></div><div class="card-b" id="ch"></div></div>' +
       '<div class="card"><div class="card-h"><h3>' + ikon('timer') + 'Segera habis (≤ 30 hari)</h3><a href="#/kendaraan?status=HABIS30" class="btn btn-ghost btn-sm">Semua' + ikon('arrow_forward') + '</a></div><div id="habis">' + UI.sk.baris(5) + '</div></div></div>' +
       '<div class="grid g2" style="margin-top:16px"><div class="card"><div class="card-h"><h3>' + ikon('forum') + 'Pengaduan terbuka <span class="badge b-amber" id="nAdu"></span></h3><a href="#/pengaduan" class="btn btn-ghost btn-sm">Kelola' + ikon('arrow_forward') + '</a></div><div id="adu">' + UI.sk.baris(5) + '</div></div>' +
@@ -538,7 +539,7 @@
       UI.Peta.buat($('#peta'), -1.2420, 116.8940, 12).then(function (m) {
         if (!hidup()) { m.remove(); return; }
         peta = m; lapis = window.L.layerGroup().addTo(m); tandai();
-      }, function (e) { $('#peta').textContent = e.message; });
+      }, function (e) { var el = $('#peta'); if (el && hidup()) el.textContent = e.message; });
     }
     function tandai() {
       if (!peta) return; lapis.clearLayers(); var b = [];

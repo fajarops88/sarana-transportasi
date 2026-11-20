@@ -12,7 +12,17 @@
   var esc = App.esc, ikon = App.ikon, fmt = App.fmt, $ = App.$, $$ = App.$$;
   var sesi = App.Sesi.get(), me = sesi ? sesi.me : {}, PL = 'Petugas Lapangan', ADM = ['Superadmin', 'Admin ETLE'], SA = ['Superadmin'];
   var B = null;
-  var SLOT = { depan: 'Plat depan', belakang: 'Plat belakang', uji: 'Bukti uji', tambahan: 'Tambahan' };
+  var SLOT = { depan: 'Plat depan', belakang: 'Plat belakang', situasi: 'Situasi pelanggaran', uji: 'Bukti uji', tambahan: 'Tambahan' };
+  /** 4 kotak foto: plat depan*, plat belakang*, situasi; kotak ke-4 = bukti uji* (uji berkala) atau tambahan. */
+  function slotsUntuk(j) { return ['depan', 'belakang', 'situasi', j && j.perluUji ? 'uji' : 'tambahan']; }
+  function slotWajib(s) { return s === 'depan' || s === 'belakang' || s === 'uji'; }
+  /** Label pelanggaran tanpa mengulang pasal bila nama singkat sudah diawali pasal (mis. "Ps.57(1)c …"). */
+  function pelanggaran(pasal, jenis) {
+    pasal = String(pasal || ''); jenis = String(jenis || '');
+    var n = function (t) { return t.toLowerCase().replace(/[^a-z0-9]/g, ''); };
+    var sama = !pasal || (jenis && (n(jenis).indexOf(n(pasal)) === 0 || /^(ps\.?|pasal)\s*\S/i.test(jenis)));
+    return { pasal: sama ? '' : pasal, jenis: jenis || pasal };
+  }
   var WARNA = { Draft: '#64748B', Terbit: '#DC2626', 'Tindak Lanjut': '#F2A900', Selesai: '#16A34A', Dibatalkan: '#94A3B8' };
 
   function boot(cb) { return App.swr('etle.boot', {}, { maxAge: 600000, onData: function (d) { B = d; if (cb) cb(d); } }); }
@@ -81,6 +91,17 @@
     function hapusD() { D = null; FOTO = {}; ST = {}; try { localStorage.removeItem(KD); } catch (e) {} }
     function baru() { D = { id: '', langkah: 1, nopol: '', jenisKendaraan: '', merekWarna: '', namaPemilik: '', wilayah: '', idJenis: '', sanksi: [], keterangan: '', noBuktiUji: '', masaBerlakuUji: '', lokasi: '', lat: '', lng: '', foto: {}, duplikat: [], kotor: true }; FOTO = {}; ST = {}; simpanD(); return D; }
     function baris() { return { id: D.id, nopol: D.nopol, jenisKendaraan: D.jenisKendaraan, merekWarna: D.merekWarna, namaPemilik: D.namaPemilik, wilayah: D.wilayah, idJenis: D.idJenis, sanksi: D.sanksi, keterangan: D.keterangan, lokasi: D.lokasi, lat: D.lat, lng: D.lng, noBuktiUji: D.noBuktiUji, masaBerlakuUji: D.masaBerlakuUji }; }
+    /** Foto di kotak yang tidak dipakai jenis terpilih (mis. "Tambahan" saat jenis uji berkala) dihapus dari draf & server. */
+    function rapikanFoto() {
+      if (!D || !D.idJenis) return;
+      var boleh = slotsUntuk(jenisById(D.idJenis)), buang = Object.keys(D.foto || {}).concat(Object.keys(FOTO)).filter(function (s, i, a) { return a.indexOf(s) === i && boleh.indexOf(s) === -1; });
+      if (!buang.length) return;
+      buang.forEach(function (s) {
+        var adaServer = D.foto[s] && D.foto[s].ok; delete D.foto[s]; delete FOTO[s]; delete ST[s];
+        if (adaServer && D.id) App.api('etle.fotoHapus', { id: D.id, slot: s }).catch(function () {});
+      });
+      simpanD(); App.toast('Foto ' + buang.map(function (s) { return SLOT[s] || s; }).join(', ') + ' dihapus karena tidak dipakai untuk jenis pelanggaran ini.', 'info');
+    }
     /** simpan draf ke server (berurutan agar tidak membuat dua draf). */
     function sinkron(paksa) {
       antri = antri.then(function () {
@@ -106,8 +127,9 @@
       MB.innerHTML = '<div><div class="small muted">Selamat bertugas,</div><h2>' + esc(me.nama || me.email) + '</h2></div>' +
         '<a class="big-cta" href="#/catat?baru=1"><span class="bulat">' + ikon('add_a_photo') + '</span><div><h2>Catat Pelanggaran</h2><p>Kendaraan → Pelanggaran → Bukti & lokasi</p></div></a>' +
         (d && (d.nopol || d.id) ? '<a class="kasus-i" href="#/catat" style="border-color:var(--amber)"><div class="meta"><span class="badge b-amber">Draf belum terbit</span><span>' + fmt.relatif(new Date(d.diubah).toISOString()) + '</span></div><h4>' + esc(d.nopol || '(nopol belum diisi)') + '</h4><div class="small muted">Langkah ' + d.langkah + ' dari 3 · ketuk untuk melanjutkan</div></a>' : '') +
-        '<div class="grid g3" id="kpi" style="grid-template-columns:repeat(3,minmax(0,1fr));gap:8px">' + UI.sk.kartu(3) + '</div>' +
+        '<div class="grid g3" id="kpi" style="grid-template-columns:repeat(3,minmax(0,1fr));gap:8px">' + UI.sk.kartu(3) + '</div><div id="pasangK"></div>' +
         '<div class="row between"><h3>Kasus terbaru saya</h3><a href="#/kasus" class="small">Semua</a></div><div id="baru">' + UI.sk.baris(4) + '</div>';
+      App.Pasang.kartu($('#pasangK'), { kunci: 'etle', teks: 'Buka E-Tilang langsung dari layar utama HP, lebih cepat saat di lapangan.' });
       App.swr('etle.ringkas', {}, { maxAge: 20000, onData: function (r) {
         if (!$('#kpi')) return;
         $('#kpi').innerHTML = [['Hari ini', r.hariIni.total], ['Terbit', r.hariIni.terbit], ['Draf', r.hariIni.draft]].map(function (x) { return '<div class="card stat" style="padding:12px"><div class="lbl">' + x[0] + '</div><div class="val" style="font-size:26px">' + x[1] + '</div></div>'; }).join('');
@@ -178,17 +200,18 @@
         var l = B.jenis.filter(function (x) { return !q || (x.pasal + ' ' + x.uraian + ' ' + x.singkat + ' ' + x.kategori).toLowerCase().indexOf(q) > -1; });
         $('#lj').innerHTML = l.length ? l.map(function (x) { return '<label><input type="radio" name="jp" value="' + esc(x.id) + '"' + (D.idJenis === x.id ? ' checked' : '') + '><div><b class="small">' + esc(x.singkat) + '</b><div class="tiny muted">' + esc(x.pasal) + (x.kategori ? ' · ' + esc(x.kategori) : '') + '</div></div></label>'; }).join('')
           : '<div class="kosong small">' + (B.jenis.length ? 'Tidak ada yang cocok.' : 'Master jenis pelanggaran masih kosong. Hubungi Admin ETLE.') + '</div>';
-        $$('#lj input').forEach(function (r) { r.onchange = function () { if (D.idJenis !== r.value) { ubah('idJenis', r.value); D.sanksi = []; simpanD(); } detail(); }; });
+        $$('#lj input').forEach(function (r) { r.onchange = function () { if (D.idJenis !== r.value) { ubah('idJenis', r.value); D.sanksi = []; simpanD(); rapikanFoto(); } detail(); }; });
       }
       function detail() {
         j = jenisById(D.idJenis);
         if (!j) { $('#detJ').innerHTML = ''; return; }
+        if (D.sanksi.length > 1) { D.sanksi = []; D.kotor = true; simpanD(); App.toast('Satu surat hanya untuk satu sanksi. Pilih ulang sanksinya.', 'warn'); }
         if (!D.sanksi.length && j.opsi.length === 1) { D.sanksi = [j.opsi[0]]; D.kotor = true; simpanD(); }
         $('#detJ').innerHTML = '<div class="info-hukum"><b>' + esc(j.pasal) + ' — Perda Kota Balikpapan No. 7 Tahun 2022</b><div style="margin-top:6px;white-space:pre-line">' + esc(j.uraian) + '</div>' + (j.sanksi ? '<div style="margin-top:6px;opacity:.85">Sanksi: ' + esc(j.sanksi) + '</div>' : '') + '</div>' +
-          '<div class="card card-b stack"><h3>Sanksi dikenakan <span class="req">*</span></h3><div class="stack" style="gap:8px">' + j.opsi.map(function (o) { return '<label class="chk"><input type="checkbox" name="sk" value="' + esc(o) + '"' + (D.sanksi.indexOf(o) > -1 ? ' checked' : '') + '><span>' + esc(o) + '</span></label>'; }).join('') + '</div>' +
+          '<div class="card card-b stack"><h3>Sanksi dikenakan <span class="req">*</span></h3><div class="small muted" style="margin-top:-4px">Pilih <b>satu</b> sanksi yang diberikan di lapangan.</div><div class="stack" style="gap:8px">' + j.opsi.map(function (o) { return '<label class="chk"><input type="radio" name="sk" value="' + esc(o) + '"' + (D.sanksi[0] === o ? ' checked' : '') + '><span>' + esc(o) + '</span></label>'; }).join('') + '</div>' +
           (j.perluUji ? '<div class="form-grid"><div class="field"><label>Nomor bukti uji <span class="req">*</span></label><input class="inp mono" id="nbu" maxlength="60" value="' + esc(D.noBuktiUji) + '"></div><div class="field"><label>Masa berlaku uji <span class="req">*</span></label><input class="inp" type="date" id="mbu" value="' + esc(D.masaBerlakuUji) + '"></div></div>' : '') +
           '<div class="field"><label>Keterangan petugas</label><textarea class="ta" id="ket" rows="3" maxlength="600">' + esc(D.keterangan) + '</textarea><div class="hint"><span id="nk">' + D.keterangan.length + '</span>/600</div></div></div>';
-        $$('input[name=sk]').forEach(function (c) { c.onchange = function () { D.sanksi = $$('input[name=sk]:checked').map(function (x) { return x.value; }); D.kotor = true; simpanD(); }; });
+        $$('input[name=sk]').forEach(function (c) { c.onchange = function () { if (c.checked) { D.sanksi = [c.value]; D.kotor = true; simpanD(); } }; });
         $('#ket').oninput = function () { ubah('keterangan', this.value); $('#nk').textContent = this.value.length; };
         if ($('#nbu')) { $('#nbu').oninput = function () { ubah('noBuktiUji', this.value); }; $('#mbu').onchange = function () { ubah('masaBerlakuUji', this.value); }; }
       }
@@ -198,15 +221,16 @@
       $('#lanjut').onclick = function () {
         var jj = jenisById(D.idJenis);
         if (!jj) { App.toast('Pilih jenis pelanggaran.', 'warn'); return; }
-        if (!D.sanksi.length) { App.toast('Pilih minimal satu sanksi.', 'warn'); return; }
+        if (D.sanksi.length !== 1) { App.toast('Pilih satu sanksi yang dikenakan.', 'warn'); return; }
         if (jj.perluUji && (!D.noBuktiUji || !D.masaBerlakuUji)) { App.toast('Isi nomor dan masa berlaku bukti uji.', 'warn'); return; }
         langkah(3); sinkron().catch(function (e) { App.toast('Draf belum tersimpan ke server: ' + e.message, 'warn'); });
       };
     }
 
     function l3() {
-      var j = jenisById(D.idJenis), slots = ['depan', 'belakang'].concat(j && j.perluUji ? ['uji'] : []).concat(['tambahan']);
-      MB.innerHTML = steps(3) + '<div id="dup"></div><div class="card card-b stack"><h3>' + ikon('photo_camera') + ' Foto bukti</h3><div class="small muted">Plat depan dan belakang wajib' + (j && j.perluUji ? ', bukti uji wajib' : '') + '. Foto dikompres di HP lalu diunggah di latar.</div><div class="foto-grid" id="fg"></div></div>' +
+      var j = jenisById(D.idJenis), slots = slotsUntuk(j);
+      rapikanFoto();
+      MB.innerHTML = steps(3) + '<div id="dup"></div><div class="card card-b stack"><h3>' + ikon('photo_camera') + ' Foto bukti <span class="small muted" style="font-weight:500">(4 foto)</span></h3><div class="small muted">Wajib: plat depan, plat belakang' + (j && j.perluUji ? ', bukti uji' : '') + '. Situasi pelanggaran' + (j && j.perluUji ? '' : ' dan tambahan') + ' opsional. Foto dikompres di HP lalu diunggah di latar.</div><div class="foto-grid" id="fg"></div></div>' +
         '<div class="card card-b stack"><h3>' + ikon('location_on') + ' Lokasi</h3><div class="field"><label>Nama jalan / patokan <span class="req">*</span></label><input class="inp" id="lok" maxlength="200" value="' + esc(D.lokasi) + '" placeholder="Jl. Jend. Sudirman, depan …"></div>' +
         '<div class="row wrap-row"><button class="btn btn-outline" id="gps">' + ikon('my_location') + 'Ambil titik GPS</button><span class="small mono muted" id="kor">' + (D.lat ? esc(D.lat + ', ' + D.lng) : 'belum ada titik') + '</span></div></div>';
       function dup() { $('#dup').innerHTML = D.duplikat && D.duplikat.length ? '<div class="note warn">' + ikon('warning') + '<div><b>Peringatan pelanggaran berulang.</b> Nopol ' + esc(D.nopol) + ' sudah tercatat dengan jenis yang sama dalam 24 jam: ' + D.duplikat.map(function (x) { return esc(x.nomor || x.id) + ' (' + esc(x.lokasi || '-') + ')'; }).join(', ') + '. Pastikan bukan catatan ganda.</div></div>' : ''; }
@@ -215,8 +239,8 @@
         $('#fg').innerHTML = slots.map(function (s) {
           var ada = FOTO[s] || (D.foto[s] && D.foto[s].ok), st = ST[s];
           return '<label class="foto-slot' + (ada ? ' isi' : '') + '" data-slot="' + s + '">' + (FOTO[s] ? '<img src="' + FOTO[s] + '" alt="">' : '') +
-            (ada ? '' : ikon('add_a_photo') + '<b class="small">' + SLOT[s] + (s === 'tambahan' ? '' : ' *') + '</b>') +
-            '<span class="st">' + (st === 'naik' ? '<span class="badge b-info">Mengunggah…</span>' : st === 'gagal' ? '<span class="badge b-bad">Gagal — ketuk ulang</span>' : (D.foto[s] && D.foto[s].ok) ? '<span class="badge b-ok">' + ikon('check') + SLOT[s] + '</span>' : '') + '</span>' +
+            (ada ? '' : ikon('add_a_photo') + '<b class="small" style="text-align:center;padding:0 6px">' + SLOT[s] + (slotWajib(s) ? ' *' : '') + '</b>' + (slotWajib(s) ? '' : '<span class="tiny muted">opsional</span>')) +
+            '<span class="st">' + (st === 'naik' ? '<span class="badge b-info">Mengunggah…</span>' : st === 'gagal' ? '<span class="badge b-bad">Gagal — ketuk ulang</span>' : (D.foto[s] && D.foto[s].ok) ? '<span class="badge b-ok">' + ikon('check') + (s === 'situasi' ? 'Situasi' : SLOT[s]) + '</span>' : '') + '</span>' +
             (ada && st !== 'naik' ? '<button type="button" class="x" data-hapus="' + s + '" aria-label="Hapus foto">' + ikon('close') + '</button>' : '') +
             '<input type="file" accept="image/*" capture="environment"></label>';
         }).join('');
@@ -251,7 +275,7 @@
       bar('<button class="btn btn-outline" id="kembali" style="flex:none;width:52px" aria-label="Kembali">' + ikon('arrow_back') + '</button><button class="btn btn-amber grow" id="lanjut">Pratinjau' + ikon('visibility') + '</button>');
       $('#kembali').onclick = function () { langkah(2); };
       $('#lanjut').onclick = function () {
-        var kurang = slots.filter(function (s) { return s !== 'tambahan' && !(D.foto[s] && D.foto[s].ok); });
+        var kurang = slots.filter(function (s) { return slotWajib(s) && !(D.foto[s] && D.foto[s].ok); });
         if (kurang.length) { App.toast('Foto belum lengkap/terunggah: ' + kurang.map(function (s) { return SLOT[s]; }).join(', ') + '.', 'warn'); return; }
         if (!D.lokasi.trim()) { App.toast('Isi nama jalan/patokan.', 'warn'); $('#lok').focus(); return; }
         langkah(4);
@@ -314,7 +338,7 @@
       App.swr('etle.detail', { id: id }, { maxAge: 30000, onData: function (x) {
         if (location.hash.indexOf('#/kasus/') !== 0) return;
         MB.innerHTML = '<a href="#/kasus" class="small">' + ikon('arrow_back') + ' Kasus saya</a><div class="card card-b stack"><div class="row between">' + App.badge(x.status) + '<span class="small muted">' + fmt.tglJam(x.terbit || x.waktu) + '</span></div><div class="row"><span class="plate">' + esc(x.nopol) + '</span><b>' + esc(x.jenisKendaraan || '') + '</b></div>' +
-          (x.nomor ? '<div class="mono">' + esc(x.nomor) + '</div>' : '') + '<dl class="dl"><div><dt>Pelanggaran</dt><dd><b>' + esc(x.pasal || '-') + '</b> ' + esc(x.jenis || '') + '</dd></div><div><dt>Lokasi</dt><dd>' + esc(x.lokasi || '-') + '</dd></div><div><dt>Sanksi</dt><dd>' + esc(x.sanksi.join(', ') || '-') + '</dd></div>' + (x.alasanBatal ? '<div><dt>Alasan batal</dt><dd>' + esc(x.alasanBatal) + '</dd></div>' : '') + '</dl></div>' +
+          (x.nomor ? '<div class="mono">' + esc(x.nomor) + '</div>' : '') + '<dl class="dl"><div><dt>Pelanggaran</dt><dd>' + (function (p) { return (p.pasal ? '<b>' + esc(p.pasal) + '</b> ' : '') + esc(p.jenis || '-'); })(pelanggaran(x.pasal, x.jenis)) + '</dd></div><div><dt>Lokasi</dt><dd>' + esc(x.lokasi || '-') + '</dd></div><div><dt>Sanksi</dt><dd>' + esc(x.sanksi.join(', ') || '-') + '</dd></div>' + (x.alasanBatal ? '<div><dt>Alasan batal</dt><dd>' + esc(x.alasanBatal) + '</dd></div>' : '') + '</dl></div>' +
           (x.tindak.length ? '<div class="card card-b"><h3>Tindak lanjut</h3><div class="tl" style="margin-top:10px">' + x.tindak.map(function (t) { return '<div class="tl-i on"><span class="dot">' + ikon('check') + '</span><b>' + esc(t.jenis) + '</b> <span class="small muted">' + fmt.tgl(t.tanggal) + '</span><div class="small">' + esc(t.catatan || '') + '</div></div>'; }).join('') + '</div></div>' : '') +
           '<div class="row wrap-row">' + (x.status === 'Draft' ? '<button class="btn btn-amber grow" id="lanjutDraf">' + ikon('edit') + 'Lanjutkan draf</button><button class="btn btn-outline" id="hapusDraf" style="color:var(--bad)">' + ikon('delete') + 'Hapus draf</button>' : '<a class="btn btn-primary grow" href="#/surat/' + encodeURIComponent(x.id) + '">' + ikon('description') + 'Lihat / cetak surat</a>') + '</div>';
         if (x.status === 'Draft') {
@@ -331,12 +355,12 @@
       judul('Akun'); bar('');
       MB.innerHTML = '<div class="card card-b row"><span class="avatar" style="width:52px;height:52px;font-size:20px">' + (me.foto ? '<img src="' + esc(me.foto) + '" alt="" referrerpolicy="no-referrer">' : esc((me.nama || me.email || '?').charAt(0).toUpperCase())) + '</span><div><b>' + esc(me.nama || me.email) + '</b><div class="small muted">' + esc(me.email) + '</div><span class="badge b-navy">' + esc(me.role) + '</span></div></div>' +
         '<div class="card"><a class="row" href="#" id="aVersi" style="padding:14px 16px;border-bottom:1px solid var(--line);color:inherit;text-decoration:none">' + ikon('info') + '<span class="grow">Versi aplikasi</span><span class="mono small">v' + esc(App.VERSI) + '</span></a>' +
-        (App.Pasang.evt ? '<a class="row" href="#" id="aPasang" style="padding:14px 16px;border-bottom:1px solid var(--line);color:inherit;text-decoration:none">' + ikon('install_mobile') + '<span class="grow">Pasang di layar utama</span></a>' : '') +
+        (!App.Pasang.terpasang() ? '<a class="row" href="#" id="aPasang" style="padding:14px 16px;border-bottom:1px solid var(--line);color:inherit;text-decoration:none">' + ikon('install_mobile') + '<span class="grow">Pasang aplikasi di layar utama</span>' + ikon('chevron_right') + '</a>' : '<div class="row" style="padding:14px 16px;border-bottom:1px solid var(--line)">' + ikon('verified') + '<span class="grow">Aplikasi sudah terpasang</span></div>') +
         (ADM.indexOf(me.role) > -1 ? '<a class="row" href="./" style="padding:14px 16px;border-bottom:1px solid var(--line);color:inherit;text-decoration:none">' + ikon('desktop_windows') + '<span class="grow">Buka panel admin</span></a>' : '') +
         '<a class="row" href="#" id="aKeluar" style="padding:14px 16px;color:var(--bad);text-decoration:none">' + ikon('logout') + '<span class="grow">Keluar</span></a></div>' +
         '<p class="small muted center">Sesi berakhir ' + fmt.tglJam(new Date(sesi.exp).toISOString()) + '. Draf yang belum terbit tetap tersimpan di perangkat ini.</p>';
       $('#aVersi').onclick = function (e) { e.preventDefault(); Shell.riwayatVersi(); };
-      if ($('#aPasang')) $('#aPasang').onclick = function (e) { e.preventDefault(); App.Pasang.tampilkan(); };
+      if ($('#aPasang')) $('#aPasang').onclick = function (e) { e.preventDefault(); App.Pasang.mulai(); };
       $('#aKeluar').onclick = function (e) { e.preventDefault(); UI.Modal.konfirm('Keluar dari ETLE Dishub?', { ok: 'Keluar' }).then(function (ok) { if (ok) Shell.keluar(); }); };
     }
 
@@ -388,7 +412,7 @@
             '<select class="sel" data-saring="wilayah" style="width:180px;height:38px"><option value="">Semua kecamatan</option>' + (B ? B.kecamatan : []).map(function (s) { return '<option>' + esc(s) + '</option>'; }).join('') + '</select>',
           saring: function (r, k, v) { return r[k] === v; },
           kolom: [{ k: 'waktu', l: 'Waktu', f: function (r) { return fmt.tglJam(r.terbit || r.waktu); }, nilaiUrut: function (r) { return r.terbit || r.waktu; } }, { k: 'nomor', l: 'Nomor surat', cls: 'mono small' },
-            { k: 'nopol', l: 'Nopol', f: function (r) { return App.plat(r.nopol); }, cariNilai: function (r) { return r.nopol + ' ' + nn(r.nopol); } }, { k: 'jenis', l: 'Pelanggaran', f: function (r) { return '<b class="small">' + esc(r.pasal || '') + '</b><div class="tiny muted">' + esc(r.jenis || '') + '</div>'; } },
+            { k: 'nopol', l: 'Nopol', f: function (r) { return App.plat(r.nopol); }, cariNilai: function (r) { return r.nopol + ' ' + nn(r.nopol); } }, { k: 'jenis', l: 'Pelanggaran', f: function (r) { var p = pelanggaran(r.pasal, r.jenis); return p.pasal ? '<b class="small">' + esc(p.pasal) + '</b><div class="tiny muted">' + esc(p.jenis) + '</div>' : '<span class="small">' + esc(p.jenis) + '</span>'; } },
             { k: 'lokasi', l: 'Lokasi', f: function (r) { return '<span class="small">' + esc(r.lokasi || '') + '</span><div class="tiny muted">' + esc(r.wilayah || '') + '</div>'; } }, { k: 'petugas', l: 'Petugas', cls: 'small' }, { k: 'status', l: 'Status', f: function (r) { return App.badge(r.status); } }],
           onRow: function (r) { location.hash = '#/kasus?id=' + encodeURIComponent(r.id); }, kosong: { ikon: 'assignment', judul: 'Belum ada kasus' }
         });
@@ -408,7 +432,7 @@
       return App.swr('etle.detail', { id: id }, { maxAge: 20000, fresh: fresh, onData: function (x) {
         if (!hidup()) return;
         var terbuka = x.status === 'Terbit' || x.status === 'Tindak Lanjut', bisaKoreksi = x.status !== 'Draft' && x.status !== 'Dibatalkan';
-        $('#dk').innerHTML = '<div class="ph"><div><div class="eyebrow">Kasus ' + esc(x.id) + '</div><h1 class="mono">' + esc(x.nomor || '(draf)') + '</h1><p>' + App.badge(x.status) + ' ' + App.plat(x.nopol) + ' · ' + esc(x.pasal || '') + ' ' + esc(x.jenis || '') + '</p></div><div class="aksi">' +
+        $('#dk').innerHTML = '<div class="ph"><div><div class="eyebrow">Kasus ' + esc(x.id) + '</div><h1 class="mono">' + esc(x.nomor || '(draf)') + '</h1><p>' + App.badge(x.status) + ' ' + App.plat(x.nopol) + ' · ' + (function (p) { return esc((p.pasal ? p.pasal + ' ' : '') + p.jenis); })(pelanggaran(x.pasal, x.jenis)) + '</p></div><div class="aksi">' +
           (bisaKoreksi ? '<button class="btn btn-outline" id="koreksi">' + ikon('edit') + 'Koreksi</button><button class="btn btn-danger" id="batal">' + ikon('block') + 'Batalkan</button>' : '') + (x.status !== 'Draft' ? '<button class="btn btn-primary" id="surat">' + ikon('print') + 'Surat</button>' : '') + '</div></div>' +
           (terbuka ? '<div class="note crit" style="margin-bottom:16px">' + ikon('lock') + '<div>Kasus ini <b>menahan penerbitan Kartu Pengawasan SIMAU</b> untuk nopol ' + esc(x.nopol) + (x.kendaraanSimau ? ' (terdaftar di SIMAU)' : ' (tidak terdaftar di SIMAU)') + ' sampai berstatus Selesai atau Dibatalkan.</div></div>' : '') +
           '<div class="grid g2" style="align-items:start"><div class="stack"><div class="card"><div class="card-h"><h3>Data kasus</h3></div><div class="card-b"><dl class="dl">' +
@@ -436,10 +460,16 @@
             if (a) App.api('etle.batal', { id: x.id, alasan: a }).then(function (r) { App.toast('Kasus dibatalkan.', 'ok'); muat(true); App.swr('etle.list', {}, { fresh: true }).catch(function () {}); }, function (e) { App.toast(e.message, 'bad'); });
           });
         };
+        function opsiSanksi(idJenis, kini) {
+          var jj = jenisById(idJenis), op = jj ? jj.opsi.slice() : [];
+          var lama = (kini || []).join('; ');
+          if (lama && (kini.length !== 1 || op.indexOf(kini[0]) === -1)) op.unshift({ v: (kini || []).join(';'), l: '(data lama) ' + lama });
+          return op;
+        }
         if ($('#koreksi')) $('#koreksi').onclick = function () {
           var F = [{ k: 'nopol', l: 'Nomor polisi', mono: true, maks: 12 }, { k: 'jenis_kendaraan', l: 'Jenis kendaraan', t: 'select', opsi: B.jenisKendaraan }, { k: 'merek_warna', l: 'Merek / warna' }, { k: 'nama_pemilik', l: 'Pemilik / pengemudi' },
             { k: 'wilayah', l: 'Kecamatan', t: 'select', opsi: B.kecamatan, kosong: '—' }, { k: 'lokasi_teks', l: 'Lokasi', full: true }, { k: 'id_jenis', l: 'Jenis pelanggaran', t: 'select', full: true, opsi: B.jenis.map(function (j) { return { v: j.id, l: j.pasal + ' — ' + j.singkat }; }) },
-            { k: 'sanksi_dikenakan', l: 'Sanksi (pisahkan dengan ;)', full: true }, { k: 'keterangan', l: 'Keterangan', t: 'textarea', rows: 2 }, { k: 'no_bukti_uji', l: 'Nomor bukti uji' }, { k: 'masa_berlaku_uji', l: 'Masa berlaku uji', t: 'date' },
+            { k: 'sanksi_dikenakan', l: 'Sanksi dikenakan (satu)', t: 'select', full: true, opsi: opsiSanksi(x.idJenis, x.sanksi) }, { k: 'keterangan', l: 'Keterangan', t: 'textarea', rows: 2 }, { k: 'no_bukti_uji', l: 'Nomor bukti uji' }, { k: 'masa_berlaku_uji', l: 'Masa berlaku uji', t: 'date' },
             { k: 'alasan', l: 'Alasan koreksi (wajib, tercatat di log)', t: 'textarea', rows: 2, wajib: true }];
           var awal = { nopol: x.nopol, jenis_kendaraan: x.jenisKendaraan, merek_warna: x.merekWarna, nama_pemilik: x.namaPemilik, wilayah: x.wilayah, lokasi_teks: x.lokasi, id_jenis: x.idJenis, sanksi_dikenakan: x.sanksi.join(';'), keterangan: x.keterangan, no_bukti_uji: x.noBuktiUji, masa_berlaku_uji: x.masaBerlakuUji };
           UI.Modal.buka({ judul: 'Koreksi ' + x.nomor, lebar: 'lebar', isi: '<div class="note warn" style="margin-bottom:12px">' + ikon('info') + '<div class="small">Hanya kolom yang berubah yang dikirim. Nilai lama dan baru tercatat di log audit.</div></div><form id="fKor">' + UI.Form.bangun(F, awal) + '</form>',
@@ -451,6 +481,10 @@
               if (d.alasan.trim().length < 5) { App.toast('Alasan minimal 5 karakter.', 'warn'); return false; }
               return App.api('etle.koreksi', { id: x.id, perubahan: ubah, alasan: d.alasan }).then(function () { App.toast('Koreksi tersimpan.', 'ok'); muat(true); App.swr('etle.list', {}, { fresh: true }).catch(function () {}); });
             } }] });
+          var fk = document.getElementById('fKor');
+          if (fk && fk.elements.id_jenis && fk.elements.sanksi_dikenakan) fk.elements.id_jenis.onchange = function () {
+            var v = this.value; fk.elements.sanksi_dikenakan.innerHTML = UI.Form.opsi(opsiSanksi(v, v === x.idJenis ? x.sanksi : []), v === x.idJenis ? x.sanksi.join(';') : '');
+          };
         };
       } }).catch(function (e) { if (hidup()) $('#dk').innerHTML = '<div class="card">' + galat(e) + '</div>'; });
     }

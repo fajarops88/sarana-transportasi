@@ -104,7 +104,7 @@
       '<div class="tiny muted" style="margin-top:8px">Sesi berakhir dalam ' + Math.floor(sisa / 60) + ' jam ' + (sisa % 60) + ' menit</div></div>' +
       '<button data-a="versi">' + ikon('info') + 'Versi aplikasi ' + esc(App.VERSI) + (App.Versi.server ? ' · server ' + esc(App.Versi.server) : '') + '</button>' +
       (S.cfg.tema !== false ? '<button data-a="tema">' + ikon('dark_mode') + (document.documentElement.dataset.tema === 'gelap' ? 'Mode terang' : 'Mode gelap') + '</button>' : '') +
-      (App.Pasang.evt ? '<button data-a="pasang">' + ikon('install_mobile') + 'Pasang sebagai aplikasi</button>' : '') +
+      (!App.Pasang.terpasang() ? '<button data-a="pasang">' + ikon('install_mobile') + 'Pasang aplikasi</button>' : '') +
       '<a href="' + App.ROOT + '" target="_blank" rel="noopener">' + ikon('public') + 'Situs publik</a>' +
       '<button data-a="keluar" style="color:var(--bad)">' + ikon('logout') + 'Keluar</button>';
     document.body.appendChild(m);
@@ -115,7 +115,7 @@
       if (a.dataset.a === 'keluar') keluar();
       if (a.dataset.a === 'tema') { var g = document.documentElement.dataset.tema === 'gelap'; if (g) delete document.documentElement.dataset.tema; else document.documentElement.dataset.tema = 'gelap'; localStorage.setItem('tema', g ? 'terang' : 'gelap'); }
       if (a.dataset.a === 'versi') riwayatVersi();
-      if (a.dataset.a === 'pasang') App.Pasang.tampilkan().then(function (ok) { if (ok) App.toast('Aplikasi dipasang di perangkat.', 'ok'); });
+      if (a.dataset.a === 'pasang') App.Pasang.mulai();
     });
   }
 

@@ -76,8 +76,9 @@
   // ================================================================== RINGKASAN
   function ringkasan(el) {
     var hidup = Shell.hidup();
+    setTimeout(function () { App.Pasang.kartu($('#pasangK'), { kunci: 'konten', hpSaja: true, teks: 'Kelola isi website langsung dari layar utama HP.' }); }, 0);
     el.innerHTML = Shell.judul(el, { eyebrow: 'Panel Konten', h: 'Ringkasan', p: 'Kelola isi situs publik Bidang Sarana Transportasi. Perubahan tampil di situs paling lambat beberapa detik setelah disimpan.', aksi: situs() }) +
-      '<div class="grid g4" id="kpi">' + UI.sk.kartu(4) + '</div>' +
+      '<div id="pasangK"></div><div class="grid g4" id="kpi">' + UI.sk.kartu(4) + '</div>' +
       '<div class="grid g2" style="margin-top:16px"><div class="card"><div class="card-h"><h3>' + ikon('forum') + 'Pengaduan terbaru</h3><a href="#/pengaduan" class="btn btn-ghost btn-sm">Semua' + ikon('arrow_forward') + '</a></div><div id="aduBaru">' + UI.sk.baris(5) + '</div></div>' +
       '<div class="card"><div class="card-h"><h3>' + ikon('bolt') + 'Pintasan</h3></div><div class="card-b grid g2" style="gap:10px">' +
       [['#/berita?baru=1', 'post_add', 'Tulis berita'], ['#/pengumuman?baru=1', 'campaign', 'Buat pengumuman'], ['#/teks', 'article', 'Ubah sambutan'], ['#/struktur', 'account_tree', 'Perbarui pejabat'], ['#/regulasi?baru=1', 'upload_file', 'Unggah regulasi'], ['#/kontak', 'contact_phone', 'Ubah kontak']].map(function (x) {
@@ -400,4 +401,5 @@
       ['WEB_Konten_Teks', 'WEB_Konten_Poin', 'WEB_Pejabat', 'WEB_Pegawai', 'WEB_Regulasi', 'WEB_Survei_Pertanyaan', 'kontak'].forEach(function (t) { data(t).catch(function () {}); });
     }
   });
+  App.daftarSW('sw.js');
 })();

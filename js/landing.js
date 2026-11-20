@@ -44,7 +44,7 @@
       '<p>Pengaduan masyarakat, cek status kendaraan angkutan umum, dan informasi sarana transportasi dalam satu pintu.</p>' +
       '<div class="row wrap-row" style="margin-top:22px"><a class="btn btn-amber btn-lg" href="#/pengaduan">' + ikon('campaign') + 'Buat Pengaduan</a><a class="btn btn-white btn-lg" href="#/cek">' + ikon('fact_check') + 'Cek Status</a></div></div>' +
       '<div class="pejabat" id="pejabat"><div class="row"><div class="foto">' + ikon('person') + '</div><div class="grow"><div class="sk sk-line" style="width:70%"></div><div class="sk sk-line" style="width:50%"></div></div></div><div class="sk sk-line" style="margin-top:16px"></div><div class="sk sk-line" style="width:80%"></div></div></div></section>' +
-      '<div class="wrap cekcepat"><div class="card"><div class="card-b"><div class="row between wrap-row" style="margin-bottom:14px"><h3>' + ikon('manage_search') + ' Cek Cepat</h3><div class="seg" id="ccTab"><button type="button" class="on" data-t="kendaraan">' + ikon('directions_bus') + 'Kendaraan</button></div></div><div id="ccForm"></div></div></div></div>' +
+      '<div class="wrap cekcepat"><div class="card"><div class="card-b"><div class="row between wrap-row" style="margin-bottom:14px"><h3>' + ikon('manage_search') + ' Cek Cepat</h3><div class="seg" id="ccTab"><button type="button" class="on" data-t="kendaraan">' + ikon('directions_bus') + 'Kendaraan</button></div></div><div id="ccForm"></div></div></div></div><div class="wrap" id="pasangK" style="margin-top:16px"></div>' +
       '<section class="sec"><div class="wrap"><div class="sec-h"><div class="eyebrow">Akses utama</div><h2>Layanan</h2></div><div class="grid g4 layanan">' +
       [['#/pengaduan', 'campaign', 'Form Pengaduan', 'Laporkan pelanggaran angkutan, pelayanan, atau fasilitas halte.', 'Buat aduan'],
        ['#/cek', 'fact_check', 'Cek Status', 'Periksa status kendaraan, surat penindakan, atau tiket pengaduan.', 'Lacak status'],
@@ -59,6 +59,7 @@
       '<section class="sec"><div class="wrap"><div class="sec-h row between wrap-row"><div><div class="eyebrow">Publikasi</div><h2>Berita Terbaru</h2></div><a href="#/berita" class="btn btn-ghost">Semua berita' + ikon('arrow_forward') + '</a></div><div class="grid g3 berita" id="berita" style="min-height:200px">' + UI.sk.kartu(3) + '</div></div></section>';
     $('#fLacak').onsubmit = function (e) { e.preventDefault(); location.hash = '#/cek?tab=tiket&kode=' + encodeURIComponent(this.kode.value.trim()); };
     formCekCepat('kendaraan');
+    App.Pasang.kartu($('#pasangK'), { kunci: 'web', hpSaja: true, teks: 'Pengaduan dan cek status langsung dari layar utama HP.' });
     muatBoot(isiBeranda, function (e) {
       ['#angkutan', '#penindakan', '#berita'].forEach(function (s) { var el = $(s); if (el) el.innerHTML = '<div style="grid-column:1/-1">' + gagal(e) + '</div>'; });
       var pj = $('#pejabat'); if (pj) pj.innerHTML = '<div class="eyebrow">Sambutan</div><p class="small muted" style="margin-top:8px">Belum dapat dimuat.</p>';
@@ -278,7 +279,7 @@
   }
   function hasilSurat(r) {
     return '<div class="card hasil-cek"><div class="card-b head"><div class="grow"><div class="small muted up">Surat penindakan ETLE Dishub</div><b class="mono" style="font-size:18px">' + esc(r.nomorSurat) + '</b></div>' + App.badge(r.status) + '</div>' +
-      '<div class="card-b" style="padding-top:0"><dl class="dl"><div><dt>Jenis pelanggaran</dt><dd>' + esc(r.jenis || '-') + '<div class="small muted mono">' + esc(r.pasal || '') + '</div></dd></div><div><dt>Tanggal terbit</dt><dd>' + fmt.tglP(r.tanggal) + '</dd></div>' +
+      '<div class="card-b" style="padding-top:0"><dl class="dl"><div><dt>Jenis pelanggaran</dt><dd>' + esc(r.jenis || r.pasal || '-') + (r.pasal && !/^(ps\.?|pasal)\s*\S/i.test(r.jenis || '') && String(r.jenis || '').toLowerCase().replace(/[^a-z0-9]/g, '').indexOf(String(r.pasal).toLowerCase().replace(/[^a-z0-9]/g, '')) !== 0 ? '<div class="small muted mono">' + esc(r.pasal) + '</div>' : '') + '</dd></div><div><dt>Tanggal terbit</dt><dd>' + fmt.tglP(r.tanggal) + '</dd></div>' +
       '<div><dt>Lokasi (jalan)</dt><dd>' + esc(r.jalan || '-') + '</dd></div><div><dt>Sanksi yang dikenakan</dt><dd>' + (r.sanksi.length ? r.sanksi.map(function (s) { return '<span class="badge b-warn" style="margin:2px">' + esc(s) + '</span>'; }).join('') : '-') + '</dd></div></dl>' +
       '<div class="note" style="margin-top:12px">' + ikon('info') + '<div>' + esc(r.keterangan) + '<div class="small muted">Data pribadi tidak ditampilkan.</div></div></div></div></div>';
   }
@@ -400,6 +401,13 @@
     fn(seg.slice(1).map(decodeURIComponent), new URLSearchParams(parts[1] || ''));
   }
   $('#burger').onclick = function () { var b = $('#nav').classList.toggle('buka'); this.setAttribute('aria-expanded', b ? 'true' : 'false'); };
+  // Pasang aplikasi: tombol di menu & footer (sembunyi bila sudah terpasang), kartu ajakan di beranda (HP)
+  (function () {
+    var tampak = !App.Pasang.terpasang();
+    $$('[data-pasang-app]').forEach(function (b) { b.classList.toggle('hide', !tampak); b.onclick = function (e) { e.preventDefault(); $('#nav').classList.remove('buka'); App.Pasang.mulai(); }; });
+    document.addEventListener('terpasang', function () { $$('[data-pasang-app]').forEach(function (b) { b.classList.add('hide'); }); });
+  })();
+  App.daftarSW('sw.js');
   $('#thn').textContent = new Date().getFullYear();
   $('#ver').textContent = App.VERSI;
   window.addEventListener('hashchange', jalan);

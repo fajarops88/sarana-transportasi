@@ -5,14 +5,14 @@
  * - Panggilan API Apps Script, login Google, QR: TIDAK pernah di-cache.
  * Naikkan VERSI bersamaan dengan js/versi.js agar cache lama dibuang.
  */
-const VERSI = '1.2.0';
+const VERSI = '1.3.0';
 const CACHE = 'etle-' + VERSI;
 const FONT = 'sarpras-font';
 const ASET = [
   './', './index.html', './manifest.webmanifest',
   '../css/app.css?v=' + VERSI, '../js/versi.js?v=' + VERSI, '../js/core.js?v=' + VERSI, '../js/ui.js?v=' + VERSI,
   '../js/shell.js?v=' + VERSI, '../js/etle.js?v=' + VERSI,
-  '../icons/logo.svg', '../icons/icon-192.png', '../icons/icon-512.png', '../icons/icon-maskable-512.png'
+  '../icons/logo.svg', '../icons/icon-192.png?v=' + VERSI, '../icons/icon-512.png?v=' + VERSI, '../icons/icon-maskable-512.png?v=' + VERSI
 ];
 const LEWAT = /script\.google(usercontent)?\.com|accounts\.google\.com|oauth2\.googleapis|api\.qrserver\.com|tile\.openstreetmap|unpkg\.com|drive\.google\.com|googleusercontent\.com\/d\//;
 

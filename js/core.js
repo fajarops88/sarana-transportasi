@@ -375,9 +375,51 @@
   })();
 
   // ------------------------------------------------------------------ PWA
+  // Pasang aplikasi (PWA): pakai jendela pasang bawaan Chrome/Edge bila tersedia; bila tidak (iPhone, atau Chrome
+  // belum menawarkan), tampilkan petunjuk langkah demi langkah sesuai perangkat.
   var Pasang = { evt: null };
   window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault(); Pasang.evt = e; document.dispatchEvent(new CustomEvent('bisa-pasang')); });
+  window.addEventListener('appinstalled', function () { Pasang.evt = null; document.dispatchEvent(new CustomEvent('terpasang')); });
   Pasang.tampilkan = function () { if (!Pasang.evt) return Promise.resolve(false); Pasang.evt.prompt(); return Pasang.evt.userChoice.then(function (c) { Pasang.evt = null; return c.outcome === 'accepted'; }); };
+  Pasang.terpasang = function () { return !!((window.matchMedia && (matchMedia('(display-mode: standalone)').matches || matchMedia('(display-mode: minimal-ui)').matches)) || navigator.standalone === true); };
+  Pasang.ios = function () { var u = navigator.userAgent || ''; return /iphone|ipad|ipod/i.test(u) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1); };
+  Pasang.android = function () { return /android/i.test(navigator.userAgent || ''); };
+  Pasang.hp = function () { return Pasang.ios() || Pasang.android() || !!(window.matchMedia && matchMedia('(max-width: 760px)').matches); };
+  Pasang.nama = function () { var m = document.querySelector('meta[name="apple-mobile-web-app-title"]'); return (m && m.content) || 'aplikasi ini'; };
+  Pasang.mulai = function () {
+    if (Pasang.evt) return Pasang.tampilkan().then(function (ok) { if (ok) toast('Aplikasi ' + Pasang.nama() + ' dipasang di perangkat.', 'ok'); return ok; });
+    Pasang.petunjuk(); return Promise.resolve(false);
+  };
+  Pasang.petunjuk = function () {
+    var u = navigator.userAgent || '', nama = esc(Pasang.nama()), langkah, catatan = '';
+    if (/FBAN|FBAV|Instagram|Line\//.test(u)) {
+      langkah = ['Ketuk menu <b>⋮</b> atau <b>…</b> di pojok layar.', 'Pilih <b>Buka di browser</b> (Chrome / Safari).', 'Di browser, buka menu ini lagi lalu ketuk <b>Pasang aplikasi</b>.'];
+    } else if (Pasang.ios()) {
+      langkah = ['Ketuk tombol <b>Bagikan</b> ' + ikon('ios_share') + ' di bilah bawah (atau atas) Safari.', 'Gulir ke bawah, pilih <b>Tambahkan ke Layar Utama</b>.', 'Ketuk <b>Tambah</b>. Ikon ' + nama + ' muncul di layar utama.'];
+      catatan = 'Di iPhone/iPad gunakan Safari. Di Chrome iPhone, tombol Bagikan ada di bilah alamat.';
+    } else if (Pasang.android()) {
+      langkah = ['Ketuk menu <b>⋮</b> di kanan atas Chrome.', 'Pilih <b>Instal aplikasi</b> atau <b>Tambahkan ke layar utama</b>.', 'Ketuk <b>Instal</b>. Ikon ' + nama + ' muncul di layar utama.'];
+      catatan = 'Bila pilihan Instal belum muncul, muat ulang halaman sekali lalu coba lagi.';
+    } else {
+      langkah = ['Klik ikon <b>Instal</b> ' + ikon('install_desktop') + ' di ujung kanan bilah alamat Chrome/Edge.', 'Atau buka menu <b>⋮</b> → <b>Simpan dan bagikan</b> / <b>Aplikasi</b> → <b>Instal</b>.', 'Aplikasi terbuka di jendela sendiri dan tersedia di menu Start/Dock.'];
+    }
+    var isi = '<div class="stack"><div class="row" style="gap:12px"><img src="' + ROOT + 'icons/icon-192.png?v=' + VERSI + '" alt="" width="52" height="52" style="border-radius:12px;flex:none"><div class="small">Pasang <b>' + nama + '</b> agar bisa dibuka langsung dari layar utama, seperti aplikasi biasa.</div></div>' +
+      '<ol class="pasang-langkah">' + langkah.map(function (x) { return '<li>' + x + '</li>'; }).join('') + '</ol>' + (catatan ? '<div class="tiny muted">' + catatan + '</div>' : '') + '</div>';
+    if (window.UI && UI.Modal) UI.Modal.buka({ judul: 'Pasang aplikasi', isi: isi, tombol: [{ l: 'Mengerti', cls: 'btn-primary' }] });
+    else alert(langkah.map(function (x, i) { return (i + 1) + '. ' + x.replace(/<[^>]+>/g, ''); }).join('\n'));
+  };
+  /** Kartu ajakan pasang (hanya bila belum terpasang). opsi: { kunci, hpSaja, teks } — ditutup = disembunyikan 14 hari. */
+  Pasang.kartu = function (el, opsi) {
+    opsi = opsi || {};
+    if (!el || Pasang.terpasang() || (opsi.hpSaja && !Pasang.hp())) { if (el) el.innerHTML = ''; return; }
+    var k = 'pasang_tutup_' + (opsi.kunci || location.pathname);
+    try { if (Number(localStorage.getItem(k) || 0) > Date.now()) { el.innerHTML = ''; return; } } catch (e) {}
+    el.innerHTML = '<div class="pasang-kartu"><img src="' + ROOT + 'icons/icon-192.png?v=' + VERSI + '" alt="" width="44" height="44"><div class="grow"><b>Pasang aplikasi ' + esc(Pasang.nama()) + '</b><small>' + esc(opsi.teks || 'Buka langsung dari layar utama HP, tanpa mengetik alamat.') + '</small></div>' +
+      '<button type="button" class="btn btn-amber btn-sm" data-pasang>' + ikon('install_mobile') + 'Pasang</button><button type="button" class="x" data-tutup aria-label="Tutup">' + ikon('close') + '</button></div>';
+    el.querySelector('[data-pasang]').onclick = function () { Pasang.mulai(); };
+    el.querySelector('[data-tutup]').onclick = function () { try { localStorage.setItem(k, String(Date.now() + 14 * 864e5)); } catch (e) {} el.innerHTML = ''; };
+    document.addEventListener('terpasang', function () { el.innerHTML = ''; }, { once: true });
+  };
   function daftarSW(path) {
     if (!('serviceWorker' in navigator)) return;
     if (location.protocol !== 'https:' && location.hostname !== 'localhost') return;

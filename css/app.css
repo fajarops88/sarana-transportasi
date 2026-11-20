@@ -430,3 +430,21 @@ html:not(.ikon-siap) .ms { visibility: hidden; }
   #cetak .kertas { box-shadow: none; border: 0; margin: 0; width: auto; min-height: 0; padding: 0; }
   .no-print { display: none !important; }
 }
+
+/* ---- 1.3.0: pasang aplikasi (PWA) ---- */
+.pasang-kartu { display: flex; align-items: center; gap: 12px; padding: 12px 12px 12px 14px; border: 1px solid rgba(242,169,0,.45); background: linear-gradient(135deg, #FFF8E6, #FFFFFF); border-radius: var(--r-lg); box-shadow: var(--sh1, 0 1px 2px rgba(0,0,0,.06)); margin-bottom: 14px; position: relative; }
+.pasang-kartu img { width: 44px; height: 44px; border-radius: 10px; flex: none; background: #fff; }
+.pasang-kartu b { display: block; font-size: 14.5px; color: var(--ink, #0F172A); }
+.pasang-kartu small { display: block; font-size: 12.5px; color: var(--muted, #64748B); line-height: 1.35; margin-top: 2px; }
+.pasang-kartu .btn { flex: none; }
+.pasang-kartu .x { flex: none; width: 30px; height: 30px; border: 0; background: transparent; color: var(--muted, #64748B); border-radius: 50%; display: grid; place-items: center; cursor: pointer; }
+.pasang-kartu .x:hover { background: rgba(15,23,42,.06); }
+[data-tema="gelap"] .pasang-kartu { background: linear-gradient(135deg, rgba(242,169,0,.12), transparent); }
+[data-tema="gelap"] .pasang-kartu b { color: #fff; }
+.pasang-langkah { margin: 0; padding-left: 22px; display: flex; flex-direction: column; gap: 10px; font-size: 14.5px; line-height: 1.45; }
+.pasang-langkah .ms { font-size: 18px; vertical-align: -4px; color: var(--navy, #0F3B67); }
+@media (max-width: 420px) { .pasang-kartu small { display: none; } }
+/* ---- 1.3.0: kontrol peta Leaflet tidak menembus jendela (lapisan modal z-index 900) ---- */
+.leaflet-container .leaflet-top, .leaflet-container .leaflet-bottom { z-index: 800; }
+.nav .nav-pasang { color: var(--navy); font-weight: 600; gap: 8px; }
+@media (min-width: 1025px) { .nav .nav-pasang { display: none !important; } }
