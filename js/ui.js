@@ -296,7 +296,12 @@
         };
       });
     },
-    opsi: function (list, pilih, kosong) { return (kosong ? '<option value="">' + esc(kosong) + '</option>' : '') + list.map(function (x) { var v = typeof x === 'object' ? x.v : x, l = typeof x === 'object' ? x.l : x; return '<option value="' + esc(v) + '"' + (String(v) === String(pilih) ? ' selected' : '') + '>' + esc(l) + '</option>'; }).join(''); }
+    // Nilai tersimpan yang tidak ada di daftar tetap dipertahankan sebagai pilihan (bukan diam-diam diganti pilihan pertama saat disimpan).
+    opsi: function (list, pilih, kosong) {
+      var ada = pilih == null || String(pilih) === '' || list.some(function (x) { return String(typeof x === 'object' ? x.v : x) === String(pilih); });
+      return (kosong ? '<option value="">' + esc(kosong) + '</option>' : '') + list.map(function (x) { var v = typeof x === 'object' ? x.v : x, l = typeof x === 'object' ? x.l : x; return '<option value="' + esc(v) + '"' + (String(v) === String(pilih) ? ' selected' : '') + '>' + esc(l) + '</option>'; }).join('') +
+        (ada ? '' : '<option value="' + esc(pilih) + '" selected>' + esc(pilih) + ' (tidak ada di daftar)</option>');
+    }
   };
 
   // ------------------------------------------------------------------ PETA (Leaflet, dimuat saat dibutuhkan)

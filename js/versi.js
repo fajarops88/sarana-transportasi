@@ -1,6 +1,12 @@
 /* Versi aplikasi — WAJIB sama dengan sw.js (simau & etle), backend/Config.gs APP.versi, dan CHANGELOG.md */
-window.APP_VERSI = '1.3.3';
+window.APP_VERSI = '1.3.4';
 window.RIWAYAT_VERSI = [
+  { v: '1.3.4', tgl: '2026-11-21', isi: [
+    '[Website] Bagan Struktur Organisasi bergaris: garis komando (tegas) Kepala Bidang → Kepala Seksi → staf, garis koordinasi (putus-putus) ke Kelompok Jabatan Fungsional',
+    '[Website] Bagan mendatar di laptop, otomatis menurun di HP atau bila cabang tidak muat',
+    '[Panel Konten] Level 3 — Kelompok Jabatan Fungsional; Unit pegawai dipilih dari daftar unit seksi/fungsional',
+    '[Panel] Pilihan tersimpan yang tidak ada di daftar tetap dipertahankan saat formulir disimpan'
+  ] },
   { v: '1.3.3', tgl: '2026-11-20', isi: [
     '[Panel Konten] Menu Website: sembunyikan/tampilkan menu, sub-menu Profil & Layanan, dan bagian Beranda (Superadmin & Admin Konten)',
     '[Website] Menu yang disembunyikan hilang dari menu atas, menu HP, footer, dan pintasan Beranda; tautan langsung menampilkan "Halaman ini sedang tidak ditampilkan"',

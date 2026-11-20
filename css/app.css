@@ -376,16 +376,72 @@ html:not(.ikon-siap) .ms { visibility: hidden; }
 .visi { background: var(--navy); color: #fff; border-radius: var(--r-lg); padding: 28px; font-size: 20px; font-weight: 600; line-height: 1.5; }
 .misi { list-style: none; padding: 0; margin: 0; counter-reset: m; } .misi li { counter-increment: m; display: flex; gap: 14px; padding: 12px 0; border-bottom: 1px solid var(--line); font-size: 15px; }
 .misi li::before { content: counter(m); width: 30px; height: 30px; border-radius: 50%; background: var(--amber); color: #111827; font-weight: 700; display: grid; place-items: center; flex: none; }
-.org { display: flex; flex-direction: column; align-items: center; gap: 28px; width: 100%; }
-.org .node { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-lg); padding: 14px; text-align: center; box-shadow: var(--sh1); width: 220px; max-width: 100%; }
-.org .node.kepala { border-top: 4px solid var(--amber); width: 260px; }
-.org .node img, .org .node .av { width: 56px; height: 56px; border-radius: 50%; margin: 0 auto 8px; object-fit: cover; background: var(--tint); display: grid; place-items: center; color: var(--navy); }
-.org .node b { display: block; font-size: 14px; } .org .node span { display: block; font-size: 12px; color: var(--muted); margin-top: 2px; }
-.org .lvl { display: flex; flex-wrap: wrap; justify-content: center; gap: 20px; width: 100%; }
-.org .cab { display: flex; flex-direction: column; align-items: center; gap: 12px; flex: 1 1 260px; max-width: 360px; }
-.org .staf { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; width: 100%; }
-.org .staf .node { width: auto; padding: 10px; } .org .staf .node .av, .org .staf .node img { width: 40px; height: 40px; }
-@media (max-width: 520px) { .org .staf { grid-template-columns: minmax(0, 1fr); } }
+.pohon { --gr: #8A9BB0; --gt: 2px; --tg: 26px; overflow-x: auto; padding: 4px 2px 12px; }
+.pohon ul { display: flex; justify-content: center; align-items: flex-start; list-style: none; margin: 0; padding: var(--tg) 0 0; position: relative; }
+.pohon > ul { padding-top: 0; }
+.pohon li { position: relative; display: flex; flex-direction: column; align-items: center; padding: var(--tg) 10px 0; flex: 0 1 260px; min-width: 0; }
+.pohon > ul > li { padding-top: 0; flex: 1 1 auto; }
+/* garis pohon mendatar: separuh kiri (::before) + separuh kanan & turun (::after) */
+.pohon li::before, .pohon li::after { content: ''; position: absolute; top: 0; right: 50%; width: 50%; height: var(--tg); border-top: var(--gt) solid var(--gr); }
+.pohon li::after { right: auto; left: 50%; border-left: var(--gt) solid var(--gr); }
+.pohon li:only-child::before, .pohon li:only-child::after { display: none; }
+.pohon li:only-child { padding-top: 0; }
+.pohon li:first-child::before, .pohon li:last-child::after { border: 0 none; }
+.pohon li:last-child::before { border-right: var(--gt) solid var(--gr); border-radius: 0 8px 0 0; }
+.pohon li:first-child::after { border-radius: 8px 0 0 0; }
+.pohon ul ul::before { content: ''; position: absolute; top: 0; left: 50%; height: var(--tg); border-left: var(--gt) solid var(--gr); }
+.pohon > ul > li::before, .pohon > ul > li::after, .pohon > ul.tanpa-akar::before { display: none; }
+.pohon > ul.tanpa-akar > li { flex: 0 1 260px; }
+/* kartu */
+.pohon .node { position: relative; z-index: 1; background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-lg); padding: 14px; text-align: center; box-shadow: var(--sh1); width: 240px; max-width: 100%; }
+.pohon .node.kepala { border-top: 4px solid var(--amber); width: 280px; }
+.pohon .node img, .pohon .node .av { width: 56px; height: 56px; border-radius: 50%; margin: 0 auto 8px; object-fit: cover; background: var(--tint); display: grid; place-items: center; color: var(--navy); flex: none; }
+.pohon .node .av .ms { font-size: 28px; } .pohon .grup .node .av .ms, .pohon .jf .node .av .ms { font-size: 20px; }
+.pohon .node b { display: block; font-size: 14px; } .pohon .node span { display: block; font-size: 12px; color: var(--muted); margin-top: 2px; }
+/* kelompok staf di bawah pejabat (garis komando dari kartu pejabat) */
+.pohon .grup { position: relative; margin-top: 22px; width: 100%; max-width: 280px; background: var(--bg); border: 1px solid var(--line); border-radius: var(--r-lg); padding: 10px; display: grid; gap: 8px; }
+.pohon .grup::before { content: ''; position: absolute; left: 50%; top: -22px; height: 22px; border-left: var(--gt) solid var(--gr); }
+.pohon .grup.langsung { margin-top: 0; } .pohon .grup.langsung::before { display: none; }
+.pohon .grup-j { font-size: 11px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); padding: 2px 4px; text-align: left; }
+.pohon .grup .node { width: auto; display: flex; align-items: center; gap: 10px; text-align: left; padding: 8px 10px; box-shadow: none; }
+.pohon .grup .node img, .pohon .grup .node .av { width: 36px; height: 36px; margin: 0; }
+/* Kelompok Jabatan Fungsional: di samping batang, garis koordinasi putus-putus */
+.pohon .jf-baris { position: relative; display: grid; grid-template-columns: 1fr 1fr; width: 100%; padding-top: 18px; }
+.pohon .jf-baris::before { content: ''; position: absolute; left: 50%; top: 0; bottom: 0; border-left: var(--gt) solid var(--gr); }
+.pohon .jf-baris.akhir::before { bottom: 50%; }
+.pohon > .jf-baris::before, .pohon > .jf-baris .jf::before { display: none; }
+.pohon .jf { grid-column: 2; justify-self: start; position: relative; margin-left: 40px; width: 260px; max-width: calc(100% - 40px); background: var(--surface); border: 1.5px dashed var(--gr); border-radius: var(--r-lg); padding: 10px; display: grid; gap: 8px; }
+.pohon .jf::before { content: ''; position: absolute; right: 100%; top: 50%; width: 40px; border-top: var(--gt) dashed var(--gr); }
+.pohon .jf .node { width: auto; display: flex; align-items: center; gap: 10px; text-align: left; padding: 8px 10px; box-shadow: none; }
+.pohon .jf .node img, .pohon .jf .node .av { width: 36px; height: 36px; margin: 0; }
+.pohon .jf .grup { margin-top: 0; max-width: none; } .pohon .jf .grup::before { display: none; }
+.pohon-ket { display: flex; flex-wrap: wrap; gap: 18px; justify-content: center; margin-top: 8px; }
+.pohon-ket span { display: inline-flex; align-items: center; gap: 8px; } .pohon-ket .gk { width: 28px; border-top: 2px solid #8A9BB0; } .pohon-ket .gk.putus { border-top-style: dashed; }
+/* pohon menurun (HP / cabang banyak): rel di kiri, garis siku ke tiap kartu */
+.pohon.tegak { overflow: visible; }
+.pohon.tegak ul { display: block; padding: 0 0 0 0; margin-left: 18px; }
+.pohon.tegak > ul { margin-left: 0; }
+.pohon.tegak li { display: block; padding: 14px 0 0 24px; }
+.pohon.tegak > ul > li { padding: 0; }
+.pohon.tegak li::before { display: block; left: 0; right: auto; top: 0; width: 22px; height: 46px; border: 0; border-left: var(--gt) solid var(--gr); border-bottom: var(--gt) solid var(--gr); border-radius: 0 0 0 8px; }
+.pohon.tegak li::after { display: block; left: 0; top: 46px; bottom: 0; width: 0; height: auto; border: 0; border-left: var(--gt) solid var(--gr); border-radius: 0; }
+.pohon.tegak li:last-child::after { display: none; }
+.pohon.tegak li:only-child { padding-top: 14px; } .pohon.tegak li:only-child::before { display: block; }
+.pohon.tegak ul ul::before { display: none; }
+.pohon.tegak > ul > li::before, .pohon.tegak > ul > li::after, .pohon.tegak > ul > li:only-child::before { display: none; }
+.pohon.tegak > ul > li, .pohon.tegak > ul > li:only-child { padding: 0; }
+.pohon.tegak > ul.tanpa-akar > li + li { padding-top: 14px; }
+.pohon.tegak .node { display: flex; align-items: center; gap: 12px; text-align: left; width: 100%; max-width: 440px; padding: 12px; }
+.pohon.tegak .node img, .pohon.tegak .node .av { width: 44px; height: 44px; margin: 0; }
+.pohon.tegak .node.kepala { width: 100%; }
+.pohon.tegak .grup { max-width: 440px; margin: 14px 0 0 24px; width: calc(100% - 24px); }
+.pohon.tegak .grup::before { left: -14px; top: -14px; height: calc(50% + 14px); width: 12px; border-left: var(--gt) solid var(--gr); border-bottom: var(--gt) solid var(--gr); border-radius: 0 0 0 8px; }
+.pohon.tegak .grup.langsung { margin: 0; width: 100%; }
+.pohon.tegak .jf-baris { display: block; margin-left: 18px; padding: 14px 0 0 24px; }
+.pohon.tegak .jf-baris::before { left: 0; }
+.pohon.tegak .jf-baris.akhir::before { bottom: auto; height: calc(14px + 50%); }
+.pohon.tegak .jf { margin-left: 0; width: 100%; max-width: 440px; }
+.pohon.tegak .jf::before { width: 24px; }
 .hasil-cek .head { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
 .dl { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; } .dl > div { background: var(--bg); border-radius: var(--r); padding: 12px 14px; }
 .dl dt { font-size: 12px; color: var(--muted); } .dl dd { margin: 4px 0 0; font-weight: 600; }

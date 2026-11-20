@@ -70,7 +70,7 @@
     }
     el.innerHTML = UI.sk.baris(8);
     muat();
-    return { muat: muat, form: form };
+    return { muat: muat, form: form, gambar: function () { if (tbl) tbl.render(); } };
   }
 
   // ================================================================== RINGKASAN
@@ -184,27 +184,34 @@
 
   // ================================================================== STRUKTUR: PEJABAT & PEGAWAI
   function struktur(el) {
-    el.innerHTML = Shell.judul(el, { eyebrow: 'Halaman profil', h: 'Struktur Organisasi', p: 'Pejabat level 1 tampil di puncak bagan; pejabat level 2 sebagai cabang. Pegawai dikelompokkan ke cabang menurut kolom Unit yang sama persis.', aksi: situs('#/profil/struktur') }) +
+    el.innerHTML = Shell.judul(el, { eyebrow: 'Halaman profil', h: 'Struktur Organisasi', p: 'Level 1 tampil di puncak bagan; level 2 sebagai cabang (garis komando); level 3 sebagai Kelompok Jabatan Fungsional di samping (garis koordinasi). Pegawai ditempatkan di bawah pejabat yang Unit-nya sama; pegawai tanpa unit cabang tersambung langsung ke Kepala Bidang.', aksi: situs('#/profil/struktur') }) +
       '<div class="stack-lg"><div><h3 style="margin-bottom:10px">Pejabat</h3><div class="card" id="tPj"></div></div><div><h3 style="margin-bottom:10px">Pegawai / staf</h3><div class="card" id="tPg"></div></div></div>' +
       '<datalist id="dlUnit"></datalist>';
     var foto = function (r) { return r.FOTO_URL ? '<img src="' + esc(r.FOTO_URL) + '" alt="" referrerpolicy="no-referrer" style="width:36px;height:36px;border-radius:50%;object-fit:cover;vertical-align:middle;margin-right:8px">' : '<span class="avatar" style="width:36px;height:36px;display:inline-grid;margin-right:8px;vertical-align:middle">' + ikon('person') + '</span>'; };
     var unitList = [];
+    // Unit pegawai dipilih dari unit pejabat seksi/fungsional (bukan diketik) agar pasti tersambung di bagan.
+    var fUnitPg = { k: 'UNIT', l: 'Unit / seksi', t: 'select', opsi: [], kosong: '— Langsung di bawah Kepala Bidang —', hint: 'Pilihan diambil dari kolom Unit pejabat level 2 dan 3.' };
     crud($('#tPj'), {
       tabel: 'WEB_Pejabat', judul: 'pejabat', tambah: 'Tambah pejabat', cari: 'Cari nama, jabatan, unit…', sortAwal: 'URUTAN', perHal: 20,
       kolom: [{ k: 'NAMA', l: 'Nama', f: function (r) { return foto(r) + '<b>' + esc(r.NAMA) + '</b>' + (/^ya$/i.test(r.TAMPIL_BERANDA) ? ' <span class="badge b-amber">Beranda</span>' : ''); } },
-        { k: 'JABATAN', l: 'Jabatan' }, { k: 'UNIT', l: 'Unit' }, { k: 'LEVEL', l: 'Level', f: function (r) { return r.LEVEL === '1' ? 'Kepala bidang' : 'Kepala seksi'; } }, { k: 'URUTAN', l: 'Urut', cls: 'right', nilaiUrut: function (r) { return Number(r.URUTAN) || 999; } }],
+        { k: 'JABATAN', l: 'Jabatan' }, { k: 'UNIT', l: 'Unit' }, { k: 'LEVEL', l: 'Level', f: function (r) { return r.LEVEL === '1' ? 'Kepala bidang' : r.LEVEL === '3' ? 'Jabatan fungsional' : 'Kepala seksi'; } }, { k: 'URUTAN', l: 'Urut', cls: 'right', nilaiUrut: function (r) { return Number(r.URUTAN) || 999; } }],
       fields: [{ k: 'NAMA', l: 'Nama lengkap dan gelar', wajib: true, maks: 120 }, { k: 'NIP', l: 'NIP', mono: true, maks: 30 }, { k: 'JABATAN', l: 'Jabatan', wajib: true, full: true, maks: 200 },
         { k: 'UNIT', l: 'Unit / seksi', full: true, atr: ' list="dlUnit"', hint: 'Pegawai dengan Unit yang sama akan tampil di bawah pejabat ini.' },
-        { k: 'LEVEL', l: 'Level di bagan', t: 'select', opsi: [{ v: '1', l: '1 — Kepala bidang (puncak)' }, { v: '2', l: '2 — Kepala seksi (cabang)' }], awal: '2' }, { k: 'URUTAN', l: 'Urutan', t: 'number', min: 1, awal: '' },
+        { k: 'LEVEL', l: 'Level di bagan', t: 'select', opsi: [{ v: '1', l: '1 — Kepala bidang (puncak)' }, { v: '2', l: '2 — Kepala seksi (cabang, garis komando)' }, { v: '3', l: '3 — Kelompok Jabatan Fungsional (garis koordinasi)' }], awal: '2' }, { k: 'URUTAN', l: 'Urutan', t: 'number', min: 1, awal: '' },
         { k: 'TAMPIL_BERANDA', l: 'Tampilkan foto, nama, dan sambutan di Beranda (pilih satu orang)', t: 'switch', full: true }, { k: 'FOTO_URL', l: 'Foto', t: 'berkas', hint: 'Foto dikompres otomatis di perangkat sebelum diunggah.' }],
-      onData: function (d) { unitList = d.map(function (x) { return x.UNIT; }).filter(String); $('#dlUnit').innerHTML = unitList.map(function (u) { return '<option value="' + esc(u) + '">'; }).join(''); }
+      onData: function (d) {
+        unitList = d.map(function (x) { return x.UNIT; }).filter(String);
+        fUnitPg.opsi = d.filter(function (x) { return x.LEVEL !== '1' && x.UNIT; }).map(function (x) { return x.UNIT; }).filter(function (u, i, a) { return a.indexOf(u) === i; });
+        if (cPg) cPg.gambar();   // tanda "langsung ke Kepala Bidang" di tabel pegawai bergantung pada daftar unit ini
+        $('#dlUnit').innerHTML = unitList.map(function (u) { return '<option value="' + esc(u) + '">'; }).join(''); }
     });
-    crud($('#tPg'), {
+    var cPg = null;
+    cPg = crud($('#tPg'), {
       tabel: 'WEB_Pegawai', judul: 'pegawai', tambah: 'Tambah pegawai', cari: 'Cari nama, jabatan, unit…', sortAwal: 'URUTAN', perHal: 20,
       kolom: [{ k: 'NAMA', l: 'Nama', f: function (r) { return foto(r) + '<b>' + esc(r.NAMA) + '</b>'; } }, { k: 'JABATAN', l: 'Jabatan' },
-        { k: 'UNIT', l: 'Unit', f: function (r) { return esc(r.UNIT || '') + (r.UNIT && unitList.indexOf(r.UNIT) === -1 ? ' <span class="badge b-warn" title="Tidak ada pejabat dengan unit ini; tampil di kelompok Staf">tanpa cabang</span>' : ''); } },
+        { k: 'UNIT', l: 'Unit', f: function (r) { return esc(r.UNIT || '') + (r.UNIT && fUnitPg.opsi.map(function (u) { return u.trim().toLowerCase(); }).indexOf(String(r.UNIT).trim().toLowerCase()) === -1 ? ' <span class="badge b-warn" title="Tidak ada seksi/fungsional dengan unit ini; di bagan tersambung langsung ke Kepala Bidang">langsung ke Kepala Bidang</span>' : ''); } },
         { k: 'URUTAN', l: 'Urut', cls: 'right', nilaiUrut: function (r) { return Number(r.URUTAN) || 999; } }],
-      fields: [{ k: 'NAMA', l: 'Nama', wajib: true, maks: 120 }, { k: 'JABATAN', l: 'Jabatan', maks: 200 }, { k: 'UNIT', l: 'Unit / seksi', atr: ' list="dlUnit"' }, { k: 'URUTAN', l: 'Urutan', t: 'number', min: 1 }, { k: 'FOTO_URL', l: 'Foto', t: 'berkas' }]
+      fields: [{ k: 'NAMA', l: 'Nama', wajib: true, maks: 120 }, { k: 'JABATAN', l: 'Jabatan', maks: 200 }, fUnitPg, { k: 'URUTAN', l: 'Urutan', t: 'number', min: 1 }, { k: 'FOTO_URL', l: 'Foto', t: 'berkas' }]
     });
   }
 

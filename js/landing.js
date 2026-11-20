@@ -178,7 +178,7 @@
     var sub = args[0] || subProfilPertama() || 'sejarah', label = (SUB.filter(function (s) { return s[0] === sub; })[0] || SUB[0])[1];
     APP.innerHTML = pageH('Profil', label) + '<div class="wrap"><div class="tabs" style="margin-bottom:24px">' + SUB.map(function (s) { return '<a href="#/profil/' + s[0] + '" data-m="profil-' + s[0] + '" class="' + (s[0] === sub ? 'on' : '') + '">' + s[1] + '</a>'; }).join('') +
       '</div><div id="isiProfil" style="min-height:300px;padding-bottom:56px">' + UI.sk.baris(8) + '</div></div>';
-    halamanData(function (d) { var el = $('#isiProfil'); if (el) el.innerHTML = renderProfil(sub, d); }).catch(function (e) { $('#isiProfil').innerHTML = gagal(e); });
+    halamanData(function (d) { var el = $('#isiProfil'); if (el) { el.innerHTML = renderProfil(sub, d); aturPohon(); } }).catch(function (e) { $('#isiProfil').innerHTML = gagal(e); });
   }
   function renderProfil(sub, d) {
     var kosong = function (t) { return '<div class="kosong card">' + ikon('edit_note') + '<h4>' + t + '</h4><div>Isi dikelola melalui Panel Konten.</div></div>'; };
@@ -205,19 +205,42 @@
       '<div class="card card-b center stack"><div style="font-size:48px">' + ikon('map') + '</div><h3>Lokasi kantor</h3>' + (k.kontak_peta ? '<a class="btn btn-outline" href="' + esc(k.kontak_peta) + '" target="_blank" rel="noopener">' + ikon('open_in_new') + 'Lihat lokasi di peta</a>' : '<p class="muted">Tautan peta belum diisi.</p>') + '</div></div>';
   }
   function nodeOrg(p, kepala) {
-    return '<div class="node' + (kepala ? ' kepala' : '') + '">' + (p.foto ? '<img src="' + esc(p.foto) + '" alt="" loading="lazy" referrerpolicy="no-referrer">' : '<div class="av">' + ikon('person') + '</div>') + '<b>' + esc(p.nama) + '</b><span>' + esc(p.jabatan) + '</span></div>';
+    return '<div class="node' + (kepala ? ' kepala' : '') + '">' + (p.foto ? '<img src="' + esc(p.foto) + '" alt="" loading="lazy" referrerpolicy="no-referrer">' : '<div class="av">' + ikon('person') + '</div>') + '<div class="tx"><b>' + esc(p.nama) + '</b><span>' + esc(p.jabatan) + '</span></div></div>';
   }
+  /**
+   * Bagan struktur organisasi (1.3.4) — daftar bersarang <ul>/<li> dengan garis dari CSS (.pohon):
+   *   Level 1 (Kepala Bidang) di puncak · Level 2 (Kepala Seksi) sebagai cabang (garis komando, tegas) ·
+   *   Level 3 (Kelompok Jabatan Fungsional) di samping batang dengan garis koordinasi (putus-putus) ·
+   *   Pegawai dikelompokkan di bawah pejabat yang Unit-nya sama (abaikan huruf besar/kecil & spasi);
+   *   pegawai yang Unit-nya tidak cocok dengan seksi/fungsional mana pun tersambung langsung ke Kepala Bidang.
+   * Lebar layar tidak cukup untuk pohon mendatar → otomatis menjadi pohon menurun (lihat aturPohon).
+   */
   function renderStruktur(d) {
     if (!d.pejabat.length) return '';
-    var kepala = d.pejabat.filter(function (p) { return p.level === 1; }), kasi = d.pejabat.filter(function (p) { return p.level !== 1; });
-    var unitKasi = kasi.map(function (k) { return k.unit; });
-    var lain = d.pegawai.filter(function (s) { return unitKasi.indexOf(s.unit) === -1; });
-    return '<div class="org">' + (kepala.length ? '<div class="lvl">' + kepala.map(function (k) { return nodeOrg(k, true); }).join('') + '</div>' : '') +
-      '<div class="lvl">' + kasi.map(function (k) {
-        var staf = d.pegawai.filter(function (s) { return s.unit && s.unit === k.unit; });
-        return '<div class="cab">' + nodeOrg(k) + (staf.length ? '<div class="staf">' + staf.map(function (s) { return nodeOrg(s); }).join('') + '</div>' : '') + '</div>';
-      }).join('') + '</div>' + (lain.length ? '<div class="cab" style="max-width:720px;width:100%"><div class="lbl-f">Staf</div><div class="staf">' + lain.map(function (s) { return nodeOrg(s); }).join('') + '</div></div>' : '') + '</div>';
+    var nu = function (u) { return String(u || '').trim().toLowerCase(); };
+    var kepala = d.pejabat.filter(function (p) { return p.level === 1; }), kasi = d.pejabat.filter(function (p) { return p.level === 2 || (p.level !== 1 && p.level !== 3); }),
+      jf = d.pejabat.filter(function (p) { return p.level === 3; });
+    var unitCabang = kasi.concat(jf).map(function (k) { return nu(k.unit); }).filter(String);
+    var stafDari = function (k) { var u = nu(k.unit); return u ? d.pegawai.filter(function (s) { return nu(s.unit) === u; }) : []; };
+    var langsung = d.pegawai.filter(function (s) { return unitCabang.indexOf(nu(s.unit)) === -1; });
+    var grup = function (staf, judul, cls) { return staf.length ? '<div class="grup' + (cls || '') + '">' + (judul ? '<div class="grup-j">' + esc(judul) + '</div>' : '') + staf.map(function (s) { return nodeOrg(s); }).join('') + '</div>' : ''; };
+    var cabang = kasi.map(function (k) { return '<li>' + nodeOrg(k) + grup(stafDari(k)) + '</li>'; });
+    if (langsung.length) cabang.push('<li class="cab-staf">' + grup(langsung, kepala.length ? 'Staf ' + (kepala[0].jabatan.replace(/^kepala\s+/i, '') || 'bidang') : 'Staf', ' langsung') + '</li>');
+    var kotakJf = jf.length ? '<div class="jf-baris' + (cabang.length ? '' : ' akhir') + '"><div class="jf" aria-label="Kelompok Jabatan Fungsional (garis koordinasi)"><div class="grup-j">Kelompok Jabatan Fungsional</div>' +
+      jf.map(function (k) { return nodeOrg(k) + grup(stafDari(k)); }).join('') + '</div></div>' : '';
+    var anak = cabang.length ? '<ul>' + cabang.join('') + '</ul>' : '';
+    var isi = kepala.length
+      ? '<ul aria-label="Bagan struktur organisasi"><li class="akar">' + kepala.map(function (k) { return nodeOrg(k, true); }).join('') + kotakJf + anak + '</li></ul>'
+      : (kotakJf ? kotakJf : '') + (cabang.length ? '<ul class="tanpa-akar" aria-label="Bagan struktur organisasi">' + cabang.join('') + '</ul>' : '');
+    return '<div class="pohon" id="pohon">' + isi + '</div><div class="pohon-ket small muted"><span><i class="gk"></i>Garis komando</span>' + (jf.length ? '<span><i class="gk putus"></i>Garis koordinasi</span>' : '') + '</div>';
   }
+  /** Pohon mendatar bila muat; bila tidak (HP, atau cabang banyak) jadi pohon menurun. Dipanggil setelah bagan digambar & saat ukuran layar berubah. */
+  function aturPohon() {
+    var p = document.getElementById('pohon'); if (!p) return;
+    p.classList.remove('tegak');
+    if (window.innerWidth < 640 || p.scrollWidth > p.clientWidth + 2) p.classList.add('tegak');
+  }
+  window.addEventListener('resize', App.debounce(aturPohon, 150));
 
   // ------------------------------------------------------------------ BERITA, PENGUMUMAN, REGULASI
   function berita(args) {
