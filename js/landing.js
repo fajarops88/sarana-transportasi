@@ -9,11 +9,46 @@
   var esc = App.esc, ikon = App.ikon, fmt = App.fmt, $ = App.$, $$ = App.$$;
   var APP = $('#app'), BOOT = null, ETLE_ON = true;
 
+  // ------------------------------------------------------------------ menu yang disembunyikan admin (1.3.3)
+  // Daftar efektif dari server (publik.boot → konfig.menuSembunyi). Diingat perangkat (localStorage) agar kunjungan
+  // berikutnya langsung benar sejak awal (skrip kecil di <head> memasang kelas sem-* sebelum halaman tergambar).
+  var SEM = {};
+  try { (JSON.parse(localStorage.getItem('menu_publik') || '[]') || []).forEach(function (m) { SEM[m] = 1; }); } catch (e) {}
+  function subProfilPertama() { var s = SUB.filter(function (x) { return !SEM['profil/' + x[0]]; })[0]; return s ? s[0] : ''; }
+  function idRute(seg) {
+    var n = seg[0] || 'beranda';
+    if (n === 'profil') { var sub = seg[1] || subProfilPertama(); return sub ? 'profil/' + sub : 'profil'; }
+    return ['berita', 'pengumuman', 'regulasi', 'pengaduan', 'cek', 'survei', 'statistik'].indexOf(n) > -1 ? n : '';
+  }
+  function ruteSekarang() { return (location.hash || '').replace(/^#\/?/, '').split('?')[0].split('/').filter(String); }
+  function terapMenu(daftar) {
+    var baru = {}; (daftar || []).forEach(function (m) { baru[m] = 1; });
+    var idR = idRute(ruteSekarang()), berubahDiSini = !!SEM[idR] !== !!baru[idR];
+    if (Object.keys(baru).sort().join() === Object.keys(SEM).sort().join()) return;
+    SEM = baru;
+    try { localStorage.setItem('menu_publik', JSON.stringify(Object.keys(SEM))); } catch (e) {}
+    var h = document.documentElement;
+    h.className = h.className.split(/\s+/).filter(function (c) { return c && c.indexOf('sem-') !== 0; }).concat(Object.keys(SEM).map(function (m) { return 'sem-' + m.replace(/\//g, '-'); })).join(' ');
+    if (!h.classList.contains('menu-awal')) {          // kunjungan pertama: yang di bawah layar langsung dilipat, sisanya disamarkan dulu
+      var bawah = window.innerHeight;
+      Object.keys(SEM).forEach(function (m) { $$('[data-m~="' + m.replace(/\//g, '-') + '"]').forEach(function (el) { var r = el.getBoundingClientRect(); if (r.top >= bawah) el.classList.add('m-lipat'); }); });
+    }
+    var pertama = subProfilPertama();
+    $$('[data-profil-pertama]').forEach(function (a) { a.setAttribute('href', '#/profil/' + (pertama || 'sejarah')); });
+    if (berubahDiSini && idR) jalan();          // halaman yang sedang dibuka baru saja dimatikan/dinyalakan
+  }
+  /** Lipat penuh menu tersembunyi saat pengunjung bertindak (pindah halaman/buka menu): pergeseran karena aksi pengguna tidak dihitung CLS. */
+  function menuLipat() { var h = document.documentElement; if (!h.classList.contains('menu-awal')) h.classList.add('menu-awal'); }
+  function halamanMati() {
+    APP.innerHTML = pageH('Informasi', 'Halaman tidak ditampilkan') + '<div class="wrap" style="padding-bottom:64px"><div class="kosong card">' + ikon('visibility_off') +
+      '<h4>Halaman ini sedang tidak ditampilkan</h4><div>Pengelola situs menonaktifkan halaman ini untuk sementara.</div><a class="btn btn-primary" href="#/" style="margin-top:16px">' + ikon('home') + 'Ke Beranda</a></div></div>';
+  }
+
   // ------------------------------------------------------------------ data bersama
   var BOOT_DIMINTA = false;
   function muatBoot(cb, onErr) {
     BOOT_DIMINTA = true;
-    return App.swr('publik.boot', {}, { maxAge: 300000, onData: function (d) { BOOT = d; ETLE_ON = d.konfig.modulEtlePublik; terapBoot(d); if (cb) cb(d); } })
+    return App.swr('publik.boot', {}, { maxAge: 300000, onData: function (d) { BOOT = d; ETLE_ON = d.konfig.modulEtlePublik; terapMenu(d.konfig.menuSembunyi); terapBoot(d); if (cb) cb(d); } })
       .catch(function (e) {
         var t = $('#ticker .txt'); if (t && !BOOT) t.textContent = 'Informasi belum dapat dimuat.';
         if (onErr && !BOOT) onErr(e);
@@ -47,21 +82,21 @@
     var html =
       '<section class="hero"><div class="wrap"><div><div class="eyebrow">Pelayanan publik transportasi</div><h1>Layanan Sarana Transportasi Kota Balikpapan</h1>' +
       '<p>Pengaduan masyarakat, cek status kendaraan angkutan umum, dan informasi sarana transportasi dalam satu pintu.</p>' +
-      '<div class="row wrap-row" style="margin-top:22px"><a class="btn btn-amber btn-lg" href="#/pengaduan">' + ikon('campaign') + 'Buat Pengaduan</a><a class="btn btn-white btn-lg" href="#/cek">' + ikon('fact_check') + 'Cek Status</a></div></div>' +
+      '<div class="row wrap-row" style="margin-top:22px" data-m="x-hero"><a class="btn btn-amber btn-lg" href="#/pengaduan" data-m="pengaduan">' + ikon('campaign') + 'Buat Pengaduan</a><a class="btn btn-white btn-lg" href="#/cek" data-m="cek">' + ikon('fact_check') + 'Cek Status</a></div></div>' +
       '<div class="pejabat" id="pejabat"><div class="kepala"><div class="eyebrow">Sambutan</div></div><div class="row"><div class="foto">' + ikon('person') + '</div><div class="grow"><div class="sk sk-line" style="width:70%"></div><div class="sk sk-line" style="width:50%"></div></div></div><div class="sk sk-line" style="margin-top:16px"></div><div class="sk sk-line" style="width:80%"></div></div></div></section>' +
-      '<div class="wrap cekcepat"><div class="card"><div class="card-b"><div class="row between wrap-row" style="margin-bottom:14px"><h2 class="h3">' + ikon('manage_search') + ' Cek Cepat</h2><div class="seg" id="ccTab"><button type="button" class="on" data-t="kendaraan">' + ikon('directions_bus') + 'Kendaraan</button>' + (ETLE_ON ? '<button type="button" data-t="surat">' + ikon('gavel') + 'Surat Tilang</button>' : '') + '</div></div><div id="ccForm"></div></div></div></div><div class="wrap" id="pasangK" style="margin-top:16px"></div>' +
-      '<section class="sec"><div class="wrap"><div class="sec-h"><div class="eyebrow">Akses utama</div><h2>Layanan</h2></div><div class="grid g4 layanan">' +
+      '<div class="wrap cekcepat" data-m="cek"><div class="card"><div class="card-b"><div class="row between wrap-row" style="margin-bottom:14px"><h2 class="h3">' + ikon('manage_search') + ' Cek Cepat</h2><div class="seg" id="ccTab"><button type="button" class="on" data-t="kendaraan">' + ikon('directions_bus') + 'Kendaraan</button>' + (ETLE_ON ? '<button type="button" data-t="surat">' + ikon('gavel') + 'Surat Tilang</button>' : '') + '</div></div><div id="ccForm"></div></div></div></div><div class="wrap" id="pasangK" data-m="pasang" style="margin-top:16px"></div>' +
+      '<section class="sec" data-m="x-layanan-kartu"><div class="wrap"><div class="sec-h"><div class="eyebrow">Akses utama</div><h2>Layanan</h2></div><div class="grid g4 layanan">' +
       [['#/pengaduan', 'campaign', 'Form Pengaduan', 'Laporkan pelanggaran angkutan, pelayanan, atau fasilitas halte.', 'Buat aduan'],
        ['#/cek', 'fact_check', 'Cek Status', 'Periksa status kendaraan, surat penindakan, atau tiket pengaduan.', 'Lacak status'],
        ['#/regulasi', 'gavel', 'Regulasi', 'Peraturan daerah dan ketentuan penyelenggaraan transportasi.', 'Unduh peraturan'],
        ['#/survei', 'reviews', 'Survei Layanan', 'Beri penilaian untuk meningkatkan mutu pelayanan.', 'Isi survei']].map(function (x) {
-        return '<a class="card hover" href="' + x[0] + '"><span class="ic">' + ikon(x[1]) + '</span><h3>' + x[2] + '</h3><p>' + x[3] + '</p><span class="go">' + x[4] + ikon('arrow_forward') + '</span></a>';
+        return '<a class="card hover" href="' + x[0] + '" data-m="' + x[0].slice(2) + '"><span class="ic">' + ikon(x[1]) + '</span><h3>' + x[2] + '</h3><p>' + x[3] + '</p><span class="go">' + x[4] + ikon('arrow_forward') + '</span></a>';
       }).join('') + '</div></div></section>' +
-      '<section class="sec alt"><div class="wrap"><div class="sec-h row between wrap-row"><div><div class="eyebrow">Inventaris resmi</div><h2>Data Angkutan Umum</h2></div></div><div class="grid g4" id="angkutan" style="min-height:130px">' + UI.sk.kartu(4) + '</div></div></section>' +
-      '<section class="sec" id="secPenindakan"><div class="wrap"><div class="sec-h"><div class="eyebrow">Pengawasan lapangan</div><h2>Penindakan</h2><p class="muted" style="margin-top:6px">Data agregat penindakan pelanggaran terkait kendaraan. Tidak memuat data perorangan.</p></div><div class="grid g2" id="penindakan" style="min-height:240px">' + UI.sk.kartu(2) + '</div></div></section>' +
-      '<section class="sec alt"><div class="wrap"><div class="lacak"><div><div class="eyebrow" style="color:#A5C9FD">Layanan mandiri warga</div><h2>Lacak Status Pengaduan</h2><p>Masukkan kode tiket yang Anda terima saat mengirim pengaduan.</p></div>' +
+      '<section class="sec alt" data-m="beranda-angkutan"><div class="wrap"><div class="sec-h row between wrap-row"><div><div class="eyebrow">Inventaris resmi</div><h2>Data Angkutan Umum</h2></div></div><div class="grid g4" id="angkutan" style="min-height:130px">' + UI.sk.kartu(4) + '</div></div></section>' +
+      '<section class="sec" id="secPenindakan" data-m="beranda-penindakan"><div class="wrap"><div class="sec-h"><div class="eyebrow">Pengawasan lapangan</div><h2>Penindakan</h2><p class="muted" style="margin-top:6px">Data agregat penindakan pelanggaran terkait kendaraan. Tidak memuat data perorangan.</p></div><div class="grid g2" id="penindakan" style="min-height:240px">' + UI.sk.kartu(2) + '</div></div></section>' +
+      '<section class="sec alt" data-m="beranda-lacak"><div class="wrap"><div class="lacak"><div><div class="eyebrow" style="color:#A5C9FD">Layanan mandiri warga</div><h2>Lacak Status Pengaduan</h2><p>Masukkan kode tiket yang Anda terima saat mengirim pengaduan.</p></div>' +
       '<form id="fLacak"><input class="inp mono" name="kode" placeholder="TKT-XXXXXX" aria-label="Kode tiket" required><button class="btn btn-amber">' + ikon('search') + 'Lacak</button></form></div></div></section>' +
-      '<section class="sec"><div class="wrap"><div class="sec-h row between wrap-row"><div><div class="eyebrow">Publikasi</div><h2>Berita Terbaru</h2></div><a href="#/berita" class="btn btn-ghost">Semua berita' + ikon('arrow_forward') + '</a></div><div class="grid g3 berita" id="berita" style="min-height:200px">' + UI.sk.kartu(3) + '</div></div></section>';
+      '<section class="sec" data-m="berita"><div class="wrap"><div class="sec-h row between wrap-row"><div><div class="eyebrow">Publikasi</div><h2>Berita Terbaru</h2></div><a href="#/berita" class="btn btn-ghost">Semua berita' + ikon('arrow_forward') + '</a></div><div class="grid g3 berita" id="berita" style="min-height:200px">' + UI.sk.kartu(3) + '</div></div></section>';
     var statis = document.querySelector('#app > section.hero[data-statis]');
     if (statis && APP.children.length === 1) { statis.removeAttribute('data-statis'); statis.insertAdjacentHTML('afterend', html.slice(html.indexOf('</section>') + 10)); }
     else APP.innerHTML = html;
@@ -103,7 +138,7 @@
     if (!$('#angkutan')) return;
     var pj = d.pejabat;
     // Tinggi kartu tetap (CSS .pejabat): nama & jabatan maks. 2 baris, kutipan maks. 4 baris; teks lengkap di halaman Profil.
-    $('#pejabat').innerHTML = '<div class="kepala"><div class="eyebrow">Sambutan</div>' + (d.sambutan ? '<a href="#/profil/sejarah">Baca lengkap</a>' : '') + '</div><div class="row">' +
+    $('#pejabat').innerHTML = '<div class="kepala"><div class="eyebrow">Sambutan</div>' + (d.sambutan ? '<a href="#/profil/sejarah" data-m="profil-sejarah">Baca lengkap</a>' : '') + '</div><div class="row">' +
       (pj && pj.foto ? '<img class="foto" src="' + esc(pj.foto) + '" alt="Foto ' + esc(pj.nama) + '" width="72" height="72" referrerpolicy="no-referrer">' : '<div class="foto">' + ikon('person') + '</div>') +
       '<div class="grow"><div class="nm">' + esc(pj ? pj.nama : d.konfig.namaDinas) + '</div><div class="jb">' + esc(pj ? pj.jabatan : '') + '</div></div></div>' +
       (d.sambutan ? '<q title="' + esc(d.sambutan.isi) + '">' + esc(d.sambutan.isi) + (d.sambutan.isi.length >= 200 ? '…' : '') + '</q>' : '');
@@ -140,8 +175,8 @@
   // ------------------------------------------------------------------ PROFIL
   var SUB = [['sejarah', 'Sejarah'], ['visi-misi', 'Visi dan Misi'], ['tugas-fungsi', 'Tugas dan Fungsi'], ['struktur', 'Struktur Organisasi'], ['kontak', 'Kontak']];
   function profil(args) {
-    var sub = args[0] || 'sejarah', label = (SUB.filter(function (s) { return s[0] === sub; })[0] || SUB[0])[1];
-    APP.innerHTML = pageH('Profil', label) + '<div class="wrap"><div class="tabs" style="margin-bottom:24px">' + SUB.map(function (s) { return '<a href="#/profil/' + s[0] + '" class="' + (s[0] === sub ? 'on' : '') + '">' + s[1] + '</a>'; }).join('') +
+    var sub = args[0] || subProfilPertama() || 'sejarah', label = (SUB.filter(function (s) { return s[0] === sub; })[0] || SUB[0])[1];
+    APP.innerHTML = pageH('Profil', label) + '<div class="wrap"><div class="tabs" style="margin-bottom:24px">' + SUB.map(function (s) { return '<a href="#/profil/' + s[0] + '" data-m="profil-' + s[0] + '" class="' + (s[0] === sub ? 'on' : '') + '">' + s[1] + '</a>'; }).join('') +
       '</div><div id="isiProfil" style="min-height:300px;padding-bottom:56px">' + UI.sk.baris(8) + '</div></div>';
     halamanData(function (d) { var el = $('#isiProfil'); if (el) el.innerHTML = renderProfil(sub, d); }).catch(function (e) { $('#isiProfil').innerHTML = gagal(e); });
   }
@@ -417,10 +452,12 @@
     $('#nav').classList.remove('buka'); $('#burger').setAttribute('aria-expanded', 'false');
     document.title = JUDUL[nama] + ' — Dishub Kota Balikpapan';
     window.scrollTo(0, 0);
+    var idR = idRute(seg);
+    if (idR && (SEM[idR] || (nama === 'profil' && SEM.profil))) { halamanMati(); document.documentElement.classList.remove('bukan-beranda'); return; }
     fn(seg.slice(1).map(decodeURIComponent), new URLSearchParams(parts[1] || ''));
     document.documentElement.classList.remove('bukan-beranda');   // dipasang skrip kecil di <head> agar hero statis tidak berkedip di tautan langsung
   }
-  $('#burger').onclick = function () { var b = $('#nav').classList.toggle('buka'); this.setAttribute('aria-expanded', b ? 'true' : 'false'); };
+  $('#burger').onclick = function () { menuLipat(); var b = $('#nav').classList.toggle('buka'); this.setAttribute('aria-expanded', b ? 'true' : 'false'); };
   // Pasang aplikasi: tombol di menu & footer (sembunyi bila sudah terpasang), kartu ajakan di beranda (HP)
   (function () {
     var tampak = !App.Pasang.terpasang();
@@ -430,7 +467,7 @@
   App.daftarSW('sw.js');
   $('#thn').textContent = new Date().getFullYear();
   $('#ver').textContent = App.VERSI;
-  window.addEventListener('hashchange', jalan);
+  window.addEventListener('hashchange', function () { menuLipat(); jalan(); });
   // Formulir publik (pengaduan, cek, survei, masuk) sering digambar setelah data tiba: label dihubungkan tiap kali isi berubah.
   if (window.MutationObserver) { var tLbl = 0; new MutationObserver(function () { if (!tLbl) tLbl = setTimeout(function () { tLbl = 0; App.labelOtomatis(APP); }, 0); }).observe(APP, { childList: true, subtree: true }); }
   jalan();

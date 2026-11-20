@@ -222,6 +222,91 @@
     }).catch(function (e) { $('#fK').innerHTML = galat(e); });
   }
 
+  // ================================================================== MENU WEBSITE (1.3.3)
+  // Sembunyikan/tampilkan menu, sub-menu, dan bagian Beranda situs publik. Sakelar menyala = tampil.
+  // Yang dikirim ke server hanya pilihan admin; server menurunkan sisanya (induk ⇄ anak, Lacak ikut Cek Status).
+  var KATALOG_MENU = [
+    { judul: 'Menu atas & footer', baris: [
+      { kunci: true, l: 'Beranda', ket: 'Selalu tampil.' },
+      { id: 'profil', l: 'Profil', ket: 'Menu Profil beserta semua halamannya.', anak: [
+        { id: 'profil/sejarah', l: 'Sejarah', ket: 'Juga tautan "Baca lengkap" di kartu Sambutan.' }, { id: 'profil/visi-misi', l: 'Visi dan Misi' }, { id: 'profil/tugas-fungsi', l: 'Tugas dan Fungsi' },
+        { id: 'profil/struktur', l: 'Struktur Organisasi' }, { id: 'profil/kontak', l: 'Kontak', ket: 'Kontak di kaki halaman tetap tampil.' }] },
+      { id: 'berita', l: 'Berita', ket: 'Juga bagian "Berita Terbaru" di Beranda.' },
+      { id: 'pengumuman', l: 'Pengumuman', ket: 'Juga pita pengumuman di atas setiap halaman.' },
+      { id: 'regulasi', l: 'Regulasi', ket: 'Juga kartu Regulasi di Beranda.' },
+      { id: 'layanan', l: 'Layanan', ket: 'Menu Layanan beserta semua halamannya.', anak: [
+        { id: 'pengaduan', l: 'Pengaduan', ket: 'Juga tombol "Buat Pengaduan" dan kartunya di Beranda.', awas: 'Warga tidak bisa mengirim pengaduan lewat website.' },
+        { id: 'cek', l: 'Cek Status', ket: 'Juga kotak Cek Cepat, tombol "Cek Status", dan kotak Lacak di Beranda.', awas: 'Warga tidak bisa melacak tiket pengaduan, memeriksa status kendaraan, atau memeriksa keaslian Surat Penindakan ETLE lewat QR-nya.' },
+        { id: 'survei', l: 'Survei Layanan', awas: 'Penilaian layanan dari warga berhenti masuk.' }] },
+      { id: 'statistik', l: 'Statistik' },
+      { id: 'pasang', l: 'Tombol "Pasang aplikasi"', ket: 'Di menu, kaki halaman, dan kartu ajakan di Beranda (HP).' },
+      { kunci: true, l: 'Masuk Petugas', ket: 'Selalu tampil di kaki halaman agar petugas tetap bisa masuk.' }] },
+    { judul: 'Bagian halaman depan (Beranda)', baris: [
+      { id: 'beranda/angkutan', l: 'Data Angkutan Umum', ket: 'Jumlah kendaraan aktif, trayek, perusahaan, dan halte.' },
+      { id: 'beranda/penindakan', l: 'Penindakan', ket: 'Ringkasan penindakan & sebaran per kecamatan.' },
+      { id: 'beranda/lacak', l: 'Lacak Status Pengaduan', ket: 'Kotak isian kode tiket.', ikut: 'cek', ikutKet: 'Ikut tersembunyi karena Cek Status disembunyikan.' }] }
+  ];
+  function menuWeb(el) {
+    var hidup = Shell.hidup(), awal = [], pilih = {}, etlePublik = true;
+    el.innerHTML = Shell.judul(el, { eyebrow: 'Tampilan situs', h: 'Menu Website', p: 'Sembunyikan atau tampilkan menu dan bagian halaman depan situs publik. Halaman yang disembunyikan juga tidak bisa dibuka lewat tautan langsung.', aksi: situs('#/') }) +
+      '<div id="mw" class="stack" style="max-width:860px">' + UI.sk.baris(8) + '</div>';
+    function semua() { var o = []; KATALOG_MENU.forEach(function (g) { g.baris.forEach(function (b) { if (b.id) o.push(b); (b.anak || []).forEach(function (a) { o.push(a); }); }); }); return o; }
+    function induk(id) { var r = null; KATALOG_MENU.forEach(function (g) { g.baris.forEach(function (b) { (b.anak || []).forEach(function (a) { if (a.id === id) r = b.id; }); }); }); return r; }
+    function tampakEfektif(id) { var p = induk(id); return !pilih[id] && !(p && pilih[p]); }
+    function baris(b, anak) {
+      var pad = anak ? 'padding-left:28px;' : '';
+      if (b.kunci) return '<div class="row between" style="padding:12px 0;' + pad + 'border-bottom:1px solid var(--line);gap:16px"><div class="grow"><b>' + esc(b.l) + '</b><div class="small muted">' + esc(b.ket) + '</div></div><span class="badge b-navy">' + ikon('lock') + 'Selalu tampil</span></div>';
+      return '<div class="row between" data-baris="' + b.id + '" style="padding:12px 0;' + pad + 'border-bottom:1px solid var(--line);gap:16px"><div class="grow"><b>' + esc(b.l) + '</b>' +
+        (b.ket ? '<div class="small muted">' + esc(b.ket) + '</div>' : '') + '<div class="small" data-ket-ikut style="color:var(--warn-tx)"></div>' +
+        (b.awas ? '<div class="small hide" data-awas style="color:var(--bad-tx)">' + ikon('warning') + ' ' + esc(b.awas) + '</div>' : '') + '</div>' +
+        '<label class="switch"><input type="checkbox" data-id="' + b.id + '" aria-label="Tampilkan ' + esc(b.l) + '"><span class="small" data-lbl></span></label></div>';
+    }
+    function gambar() {
+      $('#mw').innerHTML = KATALOG_MENU.map(function (g) {
+        return '<div class="card"><div class="card-h"><h2 class="h3">' + esc(g.judul) + '</h2></div><div class="card-b" style="padding-top:0">' +
+          g.baris.map(function (b) { return baris(b) + (b.anak || []).map(function (a) { return baris(a, true); }).join(''); }).join('') + '</div></div>';
+      }).join('') +
+        (etlePublik ? '' : '<div class="note">' + ikon('info') + '<div>Bagian <b>Penindakan</b> dan tab <b>Surat Tilang</b> saat ini juga tertutup karena modul ETLE publik dimatikan di <b>ETLE → Pengaturan</b> (khusus Superadmin).</div></div>') +
+        '<div class="card card-b row between wrap-row" style="gap:12px"><div class="small muted" id="mwInfo">Perubahan sampai ke perangkat pengunjung paling lambat sekitar 5 menit.</div>' +
+        '<div class="row" style="gap:8px"><button type="button" class="btn btn-ghost" id="mwBatal" disabled>Batal</button><button type="button" class="btn btn-primary" id="mwSimpan" disabled>' + ikon('save') + 'Simpan</button></div></div>';
+      $$('#mw [data-id]').forEach(function (c) { c.onchange = function () { if (c.checked) delete pilih[c.dataset.id]; else pilih[c.dataset.id] = 1; segarkan(); }; });
+      $('#mwBatal').onclick = function () { pilih = {}; awal.forEach(function (x) { pilih[x] = 1; }); segarkan(); };
+      $('#mwSimpan').onclick = simpanMenu;
+      segarkan();
+    }
+    function segarkan() {
+      semua().forEach(function (b) {
+        var row = $('#mw [data-baris="' + b.id + '"]'); if (!row) return;
+        var c = row.querySelector('input'), p = induk(b.id), olehInduk = p && pilih[p], olehIkut = b.ikut && !tampakEfektif(b.ikut);
+        c.checked = !pilih[b.id] && !olehInduk && !olehIkut;
+        c.disabled = !!(olehInduk || olehIkut);
+        row.querySelector('[data-lbl]').textContent = c.checked ? 'Tampil' : 'Disembunyikan';
+        row.querySelector('[data-ket-ikut]').textContent = olehInduk ? 'Ikut tersembunyi karena menu induknya disembunyikan.' : olehIkut ? b.ikutKet : '';
+        var aw = row.querySelector('[data-awas]'); if (aw) aw.classList.toggle('hide', c.checked);
+        row.style.opacity = c.disabled ? '.65' : '';
+      });
+      var sekarang = Object.keys(pilih).sort().join(), berubah = sekarang !== awal.slice().sort().join();
+      $('#mwSimpan').disabled = !berubah; $('#mwBatal').disabled = !berubah;
+    }
+    function simpanMenu() {
+      var daftar = semua().map(function (b) { return b.id; }).filter(function (id) { return pilih[id]; });
+      var baru = semua().filter(function (b) { return b.awas && !tampakEfektif(b.id) && awal.indexOf(b.id) === -1 && !(induk(b.id) && awal.indexOf(induk(b.id)) > -1); });
+      var lanjut = baru.length ? UI.Modal.konfirm('Menyembunyikan menu berikut berdampak bagi warga:<ul style="margin:10px 0 0;padding-left:18px">' +
+        baru.map(function (b) { return '<li><b>' + esc(b.l) + '</b> — ' + esc(b.awas) + '</li>'; }).join('') + '</ul>', { judul: 'Sembunyikan menu?', ok: 'Ya, sembunyikan', bahaya: true }) : Promise.resolve(true);
+      lanjut.then(function (ok) {
+        if (!ok) return;
+        UI.Form.muat($('#mwSimpan'), App.api('konten.menu.simpan', { sembunyi: daftar })).then(function (r) {
+          awal = r.sembunyi.slice(); pilih = {}; awal.forEach(function (x) { pilih[x] = 1; }); segarkan();
+          App.toast(r.efektif.length ? 'Menu situs tersimpan. ' + r.efektif.filter(function (x) { return x.indexOf('x/') !== 0; }).length + ' menu/bagian disembunyikan.' : 'Menu situs tersimpan. Semua menu tampil.', 'ok');
+        }, function (e) { App.toast(e.message, 'bad'); });
+      });
+    }
+    App.api('konten.menu', {}).then(function (d) {
+      if (!hidup() || !$('#mw')) return;
+      awal = d.sembunyi.slice(); awal.forEach(function (x) { pilih[x] = 1; }); etlePublik = d.etlePublik; gambar();
+    }, function (e) { if ($('#mw')) $('#mw').innerHTML = '<div class="card">' + galat(e) + '</div>'; });
+  }
+
   // ================================================================== LOGO (header situs/panel, favicon, kop surat)
   function logo(el) {
     var hidup = Shell.hidup(), siapSimpan = { kiri: null, kanan: null };
@@ -385,14 +470,14 @@
   Shell.mulai({
     modul: 'konten', judul: 'Panel Konten', sub: 'Situs Bidang Sarana Transportasi', judulPendek: 'KONTEN', peran: ['Superadmin', 'Admin Konten'], awal: 'ringkasan',
     menu: [
-      { grp: 'Utama', item: [{ h: '#/ringkasan', l: 'Ringkasan', i: 'dashboard' }] },
+      { grp: 'Utama', item: [{ h: '#/ringkasan', l: 'Ringkasan', i: 'dashboard' }, { h: '#/menu', l: 'Menu Website', i: 'menu_open' }] },
       { grp: 'Halaman Profil', item: [{ h: '#/teks', l: 'Profil & Sambutan', i: 'article' }, { h: '#/poin', l: 'Visi, Misi, Tugas', i: 'flag' }, { h: '#/struktur', l: 'Struktur Organisasi', i: 'account_tree' }, { h: '#/kontak', l: 'Kontak', i: 'contact_phone' }, { h: '#/logo', l: 'Logo', i: 'image' }] },
       { grp: 'Publikasi', item: [{ h: '#/berita', l: 'Berita', i: 'newspaper' }, { h: '#/pengumuman', l: 'Pengumuman', i: 'campaign' }, { h: '#/regulasi', l: 'Regulasi', i: 'gavel' }] },
       { grp: 'Layanan', item: [{ h: '#/pengaduan', l: 'Pengaduan', i: 'forum', badge: 'aduan' }, { h: '#/survei', l: 'Survei Layanan', i: 'reviews' }] },
       { grp: 'Sistem', item: [{ h: '#/akun', l: 'Kelola Akun', i: 'group', peran: SA }, { h: '#/sistem', l: 'Sistem & Keamanan', i: 'shield', peran: SA }, { h: '#/impor', l: 'Migrasi Data', i: 'sync_alt', peran: SA }] }
     ],
     rute: {
-      ringkasan: ringkasan, teks: teks, poin: poin, struktur: struktur, kontak: kontak, logo: logo, berita: berita, pengumuman: pengumuman, regulasi: regulasi, survei: survei,
+      ringkasan: ringkasan, menu: menuWeb, teks: teks, poin: poin, struktur: struktur, kontak: kontak, logo: logo, berita: berita, pengumuman: pengumuman, regulasi: regulasi, survei: survei,
       pengaduan: function (el, a, q) { Shell.halAduan(el, a, q, { onJumlah: function (n) { Shell.badgeMenu('aduan', n); } }); },
       akun: Shell.halAkun, sistem: Shell.halSistem, impor: Shell.halImpor
     },

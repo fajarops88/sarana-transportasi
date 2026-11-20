@@ -322,6 +322,53 @@ html:not(.ikon-siap) .ms { visibility: hidden; }
 .site-f .btn-amber, .site-f .btn-amber:hover { color: #111827; }   /* tautan footer berwarna biru muda; tombol kuning tetap berteks gelap */
 .site > #app { min-height: 100vh; }   /* footer mulai di bawah layar: isi yang menyusul tidak menggeser tampilan */
 .bukan-beranda #app > .hero[data-statis] { display: none; }
+/* Menu situs publik yang disembunyikan admin (1.3.3): <html class="sem-ID"> menyembunyikan elemen [data-m~="ID"].
+   .menu-awal = pengaturan sudah diketahui sejak halaman mulai (diingat perangkat) atau pengunjung sudah berpindah halaman → dilipat (display:none).
+   Tanpa .menu-awal (kunjungan pertama, pengaturan tiba setelah halaman tampil) → hanya disamarkan (ruang tetap), agar tampilan tidak
+   bergeser; yang berada di bawah layar langsung dilipat (.m-lipat). Dilipat penuh begitu pengunjung berpindah halaman atau membuka menu. */
+.menu-awal.sem-profil [data-m~="profil"],
+.menu-awal.sem-profil-sejarah [data-m~="profil-sejarah"],
+.menu-awal.sem-profil-visi-misi [data-m~="profil-visi-misi"],
+.menu-awal.sem-profil-tugas-fungsi [data-m~="profil-tugas-fungsi"],
+.menu-awal.sem-profil-struktur [data-m~="profil-struktur"],
+.menu-awal.sem-profil-kontak [data-m~="profil-kontak"],
+.menu-awal.sem-berita [data-m~="berita"],
+.menu-awal.sem-pengumuman [data-m~="pengumuman"],
+.menu-awal.sem-regulasi [data-m~="regulasi"],
+.menu-awal.sem-layanan [data-m~="layanan"],
+.menu-awal.sem-pengaduan [data-m~="pengaduan"],
+.menu-awal.sem-cek [data-m~="cek"],
+.menu-awal.sem-survei [data-m~="survei"],
+.menu-awal.sem-statistik [data-m~="statistik"],
+.menu-awal.sem-pasang [data-m~="pasang"],
+.menu-awal.sem-beranda-angkutan [data-m~="beranda-angkutan"],
+.menu-awal.sem-beranda-penindakan [data-m~="beranda-penindakan"],
+.menu-awal.sem-beranda-lacak [data-m~="beranda-lacak"],
+.menu-awal.sem-x-hero [data-m~="x-hero"],
+.menu-awal.sem-x-layanan-kartu [data-m~="x-layanan-kartu"], .m-lipat { display: none !important; }
+.sem-profil:not(.menu-awal) [data-m~="profil"],
+.sem-profil-sejarah:not(.menu-awal) [data-m~="profil-sejarah"],
+.sem-profil-visi-misi:not(.menu-awal) [data-m~="profil-visi-misi"],
+.sem-profil-tugas-fungsi:not(.menu-awal) [data-m~="profil-tugas-fungsi"],
+.sem-profil-struktur:not(.menu-awal) [data-m~="profil-struktur"],
+.sem-profil-kontak:not(.menu-awal) [data-m~="profil-kontak"],
+.sem-berita:not(.menu-awal) [data-m~="berita"],
+.sem-pengumuman:not(.menu-awal) [data-m~="pengumuman"],
+.sem-regulasi:not(.menu-awal) [data-m~="regulasi"],
+.sem-layanan:not(.menu-awal) [data-m~="layanan"],
+.sem-pengaduan:not(.menu-awal) [data-m~="pengaduan"],
+.sem-cek:not(.menu-awal) [data-m~="cek"],
+.sem-survei:not(.menu-awal) [data-m~="survei"],
+.sem-statistik:not(.menu-awal) [data-m~="statistik"],
+.sem-pasang:not(.menu-awal) [data-m~="pasang"],
+.sem-beranda-angkutan:not(.menu-awal) [data-m~="beranda-angkutan"],
+.sem-beranda-penindakan:not(.menu-awal) [data-m~="beranda-penindakan"],
+.sem-beranda-lacak:not(.menu-awal) [data-m~="beranda-lacak"],
+.sem-x-hero:not(.menu-awal) [data-m~="x-hero"],
+.sem-x-layanan-kartu:not(.menu-awal) [data-m~="x-layanan-kartu"] { visibility: hidden !important; }
+.menu-awal.sem-cek .hero { padding-bottom: 56px; }   /* tanpa kotak Cek Cepat yang menumpang di bawah hero */
+.menu-awal.sem-cek .hero + .cekcepat + #pasangK { margin-top: 24px !important; }
+
 @media (max-width: 860px) { .site-f .cols { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); } }
 @media (max-width: 520px) { .site-f .cols { grid-template-columns: minmax(0, 1fr); } }
 .page-h { padding: 36px 0 24px; } .page-h p { color: var(--muted); max-width: 760px; margin-top: 8px; }

@@ -1,6 +1,12 @@
 /* Versi aplikasi — WAJIB sama dengan sw.js (simau & etle), backend/Config.gs APP.versi, dan CHANGELOG.md */
-window.APP_VERSI = '1.3.2';
+window.APP_VERSI = '1.3.3';
 window.RIWAYAT_VERSI = [
+  { v: '1.3.3', tgl: '2026-11-20', isi: [
+    '[Panel Konten] Menu Website: sembunyikan/tampilkan menu, sub-menu Profil & Layanan, dan bagian Beranda (Superadmin & Admin Konten)',
+    '[Website] Menu yang disembunyikan hilang dari menu atas, menu HP, footer, dan pintasan Beranda; tautan langsung menampilkan "Halaman ini sedang tidak ditampilkan"',
+    '[Website] Pengaturan menu diingat perangkat sehingga kunjungan berikutnya langsung benar tanpa pergeseran tampilan',
+    '[Keamanan] Kirim pengaduan, survei, dan cek status ditolak server bila halamannya disembunyikan'
+  ] },
   { v: '1.3.2', tgl: '2026-11-20', isi: [
     '[Website] Halaman depan lebih cepat: judul utama tidak digambar ulang, tampilan tidak bergeser saat data dimuat',
     '[Website] Fon teks dan ikon dimuat dari situs sendiri; fon ikon situs publik diringkas (±11 KB, sebelumnya ratusan KB dari Google)',
