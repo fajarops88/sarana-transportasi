@@ -166,6 +166,9 @@ html:not(.ikon-siap) .ms { visibility: hidden; }
 .tbl .aksi { white-space: nowrap; text-align: right; } .tbl .aksi .btn { margin-left: 2px; }
 .tbl-bar { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; padding: 14px 16px; border-bottom: 1px solid var(--line); }
 .tbl-bar .inp-ico { flex: 1 1 240px; max-width: 360px; } .tbl-bar .inp { height: 38px; }
+/* Kolom centang (hapus draf terbengkalai) hanya tampil saat saringan umur draf aktif */
+:not(.mode-pilih) > .tbl-wrap .kol-pilih { display: none; }
+.kol-pilih input { width: 18px; height: 18px; cursor: pointer; accent-color: var(--bad); }
 .pager { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 12px 16px; font-size: 13px; color: var(--muted); flex-wrap: wrap; }
 .pager .pg { display: flex; gap: 4px; } .pager button { min-width: 32px; height: 32px; border-radius: 99px; border: 1px solid var(--line); background: var(--surface); cursor: pointer; font-weight: 600; font-size: 13px; color: var(--ink); }
 .pager button.on { background: var(--navy); color: #fff; border-color: var(--navy); } .pager button:disabled { opacity: .4; cursor: default; }

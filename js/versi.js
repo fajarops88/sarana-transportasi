@@ -1,6 +1,13 @@
 /* Versi aplikasi — WAJIB sama dengan sw.js (simau & etle), backend/Config.gs APP.versi, dan CHANGELOG.md */
-window.APP_VERSI = '1.3.0';
+window.APP_VERSI = '1.3.1';
 window.RIWAYAT_VERSI = [
+  { v: '1.3.1', tgl: '2026-11-20', isi: [
+    '[ETLE] Superadmin & Admin ETLE: tombol Hapus draf di Detail Kasus panel admin',
+    '[ETLE] Saringan "Draf terbengkalai" (≥ 3/7/14/30 hari tidak diubah) di Semua Kasus, centang lalu hapus beberapa sekaligus',
+    '[ETLE] Kartu jumlah draf terbengkalai (≥ 7 hari) di Dashboard; umur draf dihitung dari terakhir diubah',
+    '[ETLE] HP petugas memberi tahu bila drafnya sudah dihapus admin dan mengosongkan draf lokal',
+    '[Perbaikan] Simpan draf di HP tidak lagi macet setelah satu kali gagal (mis. sinyal putus)'
+  ] },
   { v: '1.3.0', tgl: '2026-11-20', isi: [
     '[ETLE] Sanksi dikenakan dipilih SATU per surat (pilihan tunggal); server menolak lebih dari satu',
     '[ETLE] Foto bukti 4 kotak: plat depan*, plat belakang*, situasi pelanggaran, tambahan (uji berkala: bukti uji*)',

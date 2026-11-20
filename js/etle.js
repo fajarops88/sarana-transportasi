@@ -23,6 +23,12 @@
     var sama = !pasal || (jenis && (n(jenis).indexOf(n(pasal)) === 0 || /^(ps\.?|pasal)\s*\S/i.test(jenis)));
     return { pasal: sama ? '' : pasal, jenis: jenis || pasal };
   }
+  /** Umur draf (hari) sejak terakhir diubah; kolom "aktif" dikirim server = diubah_pada atau waktu catat. */
+  var UMUR_DRAF = [3, 7, 14, 30], UMUR_BAWAAN = 7;
+  function hariIniLokal() { var t = new Date(); return t.getFullYear() + '-' + ('0' + (t.getMonth() + 1)).slice(-2) + '-' + ('0' + t.getDate()).slice(-2); }
+  function umurTgl(tgl) { tgl = String(tgl || '').slice(0, 10); return /^\d{4}-\d{2}-\d{2}$/.test(tgl) ? Math.max(0, Math.round((Date.parse(hariIniLokal()) - Date.parse(tgl)) / 86400000)) : 0; }
+  function umurDraf(r) { return r && r.status === 'Draft' ? umurTgl(r.aktif || r.waktu) : 0; }
+  function teksUmur(n) { return n <= 0 ? 'hari ini' : n === 1 ? 'kemarin' : n + ' hari lalu'; }
   var WARNA = { Draft: '#64748B', Terbit: '#DC2626', 'Tindak Lanjut': '#F2A900', Selesai: '#16A34A', Dibatalkan: '#94A3B8' };
 
   function boot(cb) { return App.swr('etle.boot', {}, { maxAge: 600000, onData: function (d) { B = d; if (cb) cb(d); } }); }
@@ -85,7 +91,7 @@
   // TAMPILAN HP — PETUGAS LAPANGAN
   // ======================================================================================================
   function mobile() {
-    var KD = 'etle_draf_' + me.email, D = null, FOTO = {}, ST = {}, antri = Promise.resolve(), M = {};
+    var KD = 'etle_draf_' + me.email, D = null, FOTO = {}, ST = {}, antri = Promise.resolve(), M = {}, ADMIN_HP = ADM.indexOf(me.role) > -1;
     function bacaD() { try { D = JSON.parse(localStorage.getItem(KD) || 'null'); } catch (e) { D = null; } return D; }
     function simpanD() { if (!D) return; D.diubah = Date.now(); try { localStorage.setItem(KD, JSON.stringify(D)); } catch (e) {} }
     function hapusD() { D = null; FOTO = {}; ST = {}; try { localStorage.removeItem(KD); } catch (e) {} }
@@ -98,16 +104,40 @@
       if (!buang.length) return;
       buang.forEach(function (s) {
         var adaServer = D.foto[s] && D.foto[s].ok; delete D.foto[s]; delete FOTO[s]; delete ST[s];
-        if (adaServer && D.id) App.api('etle.fotoHapus', { id: D.id, slot: s }).catch(function () {});
+        if (adaServer && D.id) App.api('etle.fotoHapus', { id: D.id, slot: s }).catch(drafHilang);
       });
       simpanD(); App.toast('Foto ' + buang.map(function (s) { return SLOT[s] || s; }).join(', ') + ' dihapus karena tidak dipakai untuk jenis pelanggaran ini.', 'info');
     }
+    /**
+     * Draf di HP sudah tidak ada di server (dihapus Admin ETLE/Superadmin, mis. karena terbengkalai).
+     * Kosongkan draf lokal dan beri tahu petugas, alih-alih macet dengan galat berulang.
+     */
+    function drafHilang(e) {
+      if (!e || e.kode !== 'DRAF_HILANG') return false;          // ApiError membawa kode server di e.kode
+      e.ditangani = true;
+      if (M.hilang) return true;
+      M.hilang = true;
+      var d0 = D || bacaD(), nop = d0 && d0.nopol, keCatat = false;
+      hapusD();
+      UI.Modal.buka({
+        judul: 'Draf sudah dihapus', lebar: 'sempit',
+        isi: '<p>Draf <b class="mono">' + esc(nop || '(tanpa nopol)') + '</b> sudah tidak ada di server. Kemungkinan dihapus Admin ETLE karena lama tidak dilanjutkan.</p><p class="small muted">Draf di HP ini sudah dikosongkan. Bila pelanggaran ini masih perlu dicatat, mulai catatan baru dan ambil ulang fotonya.</p>',
+        onTutup: function () {
+          M.hilang = false; if (keCatat) return;
+          var h = location.hash || '';
+          if (h.indexOf('#/catat') === 0) location.hash = '#/beranda'; else if (!h || h.indexOf('#/beranda') === 0) beranda();
+        },
+        tombol: [{ l: 'Tutup' }, { l: 'Catat baru', cls: 'btn-amber', ikon: 'add_a_photo', aksi: function () { keCatat = true; location.hash = '#/catat?baru=1'; } }]
+      });
+      return true;
+    }
     /** simpan draf ke server (berurutan agar tidak membuat dua draf). */
     function sinkron(paksa) {
-      antri = antri.then(function () {
+      antri = antri.catch(function () {}).then(function () {      // kegagalan sebelumnya tidak menahan simpanan berikutnya
         if (!D) return null;
         if (D.id && !D.kotor && !paksa) return D.id;
-        return App.api('etle.simpan', { row: baris() }).then(function (r) { if (!D) return null; D.id = r.id; D.duplikat = r.duplikat || []; D.kotor = false; simpanD(); return r.id; });
+        return App.api('etle.simpan', { row: baris() }).then(function (r) { if (!D) return null; if (D.id !== r.id) D.idSejak = Date.now(); D.id = r.id; D.duplikat = r.duplikat || []; D.kotor = false; simpanD(); return r.id; },
+          function (e) { drafHilang(e); throw e; });
       });
       return antri;
     }
@@ -128,9 +158,13 @@
         '<a class="big-cta" href="#/catat?baru=1"><span class="bulat">' + ikon('add_a_photo') + '</span><div><h2>Catat Pelanggaran</h2><p>Kendaraan → Pelanggaran → Bukti & lokasi</p></div></a>' +
         (d && (d.nopol || d.id) ? '<a class="kasus-i" href="#/catat" style="border-color:var(--amber)"><div class="meta"><span class="badge b-amber">Draf belum terbit</span><span>' + fmt.relatif(new Date(d.diubah).toISOString()) + '</span></div><h4>' + esc(d.nopol || '(nopol belum diisi)') + '</h4><div class="small muted">Langkah ' + d.langkah + ' dari 3 · ketuk untuk melanjutkan</div></a>' : '') +
         '<div class="grid g3" id="kpi" style="grid-template-columns:repeat(3,minmax(0,1fr));gap:8px">' + UI.sk.kartu(3) + '</div><div id="pasangK"></div>' +
-        '<div class="row between"><h3>Kasus terbaru saya</h3><a href="#/kasus" class="small">Semua</a></div><div id="baru">' + UI.sk.baris(4) + '</div>';
+        '<div class="row between"><h3>' + (ADMIN_HP ? 'Kasus terbaru' : 'Kasus terbaru saya') + '</h3><a href="#/kasus" class="small">Semua</a></div><div id="baru">' + UI.sk.baris(4) + '</div>';
       App.Pasang.kartu($('#pasangK'), { kunci: 'etle', teks: 'Buka E-Tilang langsung dari layar utama HP, lebih cepat saat di lapangan.' });
-      App.swr('etle.ringkas', {}, { maxAge: 20000, onData: function (r) {
+      App.swr('etle.ringkas', {}, { maxAge: 20000, onData: function (r, dariCache) {
+        var dl = bacaD();
+        // Draf lokal yang id-nya sudah tidak ada di server → dihapus admin. Hanya dari jawaban server (bukan cache)
+        // dan bila id sudah didapat > 2 menit lalu, agar draf yang baru saja tersimpan tidak salah dianggap hilang.
+        if (!dariCache && r.drafIds && dl && dl.id && r.drafIds.indexOf(dl.id) === -1 && Date.now() - (dl.idSejak || 0) > 120000) drafHilang({ kode: 'DRAF_HILANG' });
         if (!$('#kpi')) return;
         $('#kpi').innerHTML = [['Hari ini', r.hariIni.total], ['Terbit', r.hariIni.terbit], ['Draf', r.hariIni.draft]].map(function (x) { return '<div class="card stat" style="padding:12px"><div class="lbl">' + x[0] + '</div><div class="val" style="font-size:26px">' + x[1] + '</div></div>'; }).join('');
         $('#baru').innerHTML = r.terbaru.length ? r.terbaru.map(itemKasus).join('') : '<div class="kosong card">' + ikon('assignment') + '<h4>Belum ada catatan</h4></div>';
@@ -138,7 +172,8 @@
     }
     function itemKasus(k) {
       return '<a class="kasus-i" href="#/kasus/' + encodeURIComponent(k.id) + '"><div class="meta">' + App.badge(k.status) + '<span>' + fmt.tglJam(k.terbit || k.waktu) + '</span></div><h4><span class="mono">' + esc(k.nopol) + '</span> · ' + esc(k.jenis || '(jenis belum dipilih)') + '</h4>' +
-        '<div class="small muted">' + esc(k.lokasi || '-') + (k.nomor ? ' · <span class="mono">' + esc(k.nomor) + '</span>' : '') + '</div></a>';
+        '<div class="small muted">' + esc(k.lokasi || '-') + (k.nomor ? ' · <span class="mono">' + esc(k.nomor) + '</span>' : '') + '</div>' +
+        (ADMIN_HP || (k.status === 'Draft' && k.aktif) ? '<div class="tiny muted">' + (ADMIN_HP ? esc(k.petugas) : '') + (ADMIN_HP && k.status === 'Draft' && k.aktif ? ' · ' : '') + (k.status === 'Draft' && k.aktif ? '<span' + (umurDraf(k) >= UMUR_BAWAAN ? ' style="color:var(--bad-tx);font-weight:600"' : '') + '>diubah ' + teksUmur(umurDraf(k)) + '</span>' : '') + '</div>' : '') + '</a>';
     }
 
     // ---------------------------------------------------------------- catat (3 langkah)
@@ -223,7 +258,7 @@
         if (!jj) { App.toast('Pilih jenis pelanggaran.', 'warn'); return; }
         if (D.sanksi.length !== 1) { App.toast('Pilih satu sanksi yang dikenakan.', 'warn'); return; }
         if (jj.perluUji && (!D.noBuktiUji || !D.masaBerlakuUji)) { App.toast('Isi nomor dan masa berlaku bukti uji.', 'warn'); return; }
-        langkah(3); sinkron().catch(function (e) { App.toast('Draf belum tersimpan ke server: ' + e.message, 'warn'); });
+        langkah(3); sinkron().catch(function (e) { if (!e.ditangani) App.toast('Draf belum tersimpan ke server: ' + e.message, 'warn'); });
       };
     }
 
@@ -252,7 +287,7 @@
         $$('#fg [data-hapus]').forEach(function (b) { b.onclick = function (e) {
           e.preventDefault(); e.stopPropagation(); var s = b.dataset.hapus;
           delete FOTO[s]; var adaServer = D.foto[s] && D.foto[s].ok; delete D.foto[s]; delete ST[s]; simpanD(); gambarFoto();
-          if (adaServer && D.id) App.api('etle.fotoHapus', { id: D.id, slot: s }).catch(function (er) { App.toast(er.message, 'bad'); });
+          if (adaServer && D.id) App.api('etle.fotoHapus', { id: D.id, slot: s }).catch(function (er) { if (!drafHilang(er)) App.toast(er.message, 'bad'); });
         }; });
       }
       function unggah(s, file) {
@@ -261,7 +296,7 @@
       function kirim(s) {
         ST[s] = 'naik'; gambarFoto();
         sinkron().then(function (id) { return App.api('etle.foto', { id: id, slot: s, dataUrl: FOTO[s] }); })
-          .then(function (r) { ST[s] = 'ok'; if (D) { D.foto[s] = { ok: 1, hash: r.hash }; simpanD(); } gambarFoto(); dup(); }, function (e) { ST[s] = 'gagal'; gambarFoto(); App.toast('Foto ' + SLOT[s] + ': ' + e.message, 'bad'); });
+          .then(function (r) { ST[s] = 'ok'; if (D) { D.foto[s] = { ok: 1, hash: r.hash }; simpanD(); } gambarFoto(); dup(); }, function (e) { if (drafHilang(e)) return; ST[s] = 'gagal'; gambarFoto(); App.toast('Foto ' + SLOT[s] + ': ' + e.message, 'bad'); });
       }
       gambarFoto(); dup();
       $('#lok').oninput = function () { ubah('lokasi', this.value); };
@@ -300,7 +335,7 @@
           var id = D.id; hapusD(); App.toast('Surat terbit: ' + r.nomor, 'ok');
           App.swr('etle.ringkas', {}, { fresh: true }).catch(function () {}); App.swr('etle.list', {}, { fresh: true }).catch(function () {});
           location.hash = '#/surat/' + encodeURIComponent(id);
-        }, function (e) { App.toast(e.message, 'bad'); });
+        }, function (e) { if (!e.ditangani && !drafHilang(e)) App.toast(e.message, 'bad'); });
       };
     }
 
@@ -320,7 +355,7 @@
     }
     function kasus(args) {
       if (args[0]) return kasusDetail(args[0]);
-      judul('Kasus Saya'); bar('');
+      judul(ADMIN_HP ? 'Semua Kasus' : 'Kasus Saya'); bar('');
       var filt = '';
       MB.innerHTML = '<div class="inp-ico">' + ikon('search') + '<input class="inp" id="qk" type="search" placeholder="Cari nopol atau nomor surat…"></div><div class="seg" id="fs" style="width:100%;overflow-x:auto;flex-wrap:nowrap">' + ['', 'Draft', 'Terbit', 'Tindak Lanjut', 'Selesai', 'Dibatalkan'].map(function (s) { return '<button type="button" data-s="' + s + '" class="' + (s ? '' : 'on') + '">' + (s || 'Semua') + '</button>'; }).join('') + '</div><div id="lk">' + UI.sk.baris(6) + '</div>';
       var semua = [];
@@ -337,7 +372,7 @@
       MB.innerHTML = UI.sk.baris(10);
       App.swr('etle.detail', { id: id }, { maxAge: 30000, onData: function (x) {
         if (location.hash.indexOf('#/kasus/') !== 0) return;
-        MB.innerHTML = '<a href="#/kasus" class="small">' + ikon('arrow_back') + ' Kasus saya</a><div class="card card-b stack"><div class="row between">' + App.badge(x.status) + '<span class="small muted">' + fmt.tglJam(x.terbit || x.waktu) + '</span></div><div class="row"><span class="plate">' + esc(x.nopol) + '</span><b>' + esc(x.jenisKendaraan || '') + '</b></div>' +
+        MB.innerHTML = '<a href="#/kasus" class="small">' + ikon('arrow_back') + (ADMIN_HP ? ' Semua kasus' : ' Kasus saya') + '</a><div class="card card-b stack"><div class="row between">' + App.badge(x.status) + '<span class="small muted">' + fmt.tglJam(x.terbit || x.waktu) + '</span></div><div class="row"><span class="plate">' + esc(x.nopol) + '</span><b>' + esc(x.jenisKendaraan || '') + '</b></div>' +
           (x.nomor ? '<div class="mono">' + esc(x.nomor) + '</div>' : '') + '<dl class="dl"><div><dt>Pelanggaran</dt><dd>' + (function (p) { return (p.pasal ? '<b>' + esc(p.pasal) + '</b> ' : '') + esc(p.jenis || '-'); })(pelanggaran(x.pasal, x.jenis)) + '</dd></div><div><dt>Lokasi</dt><dd>' + esc(x.lokasi || '-') + '</dd></div><div><dt>Sanksi</dt><dd>' + esc(x.sanksi.join(', ') || '-') + '</dd></div>' + (x.alasanBatal ? '<div><dt>Alasan batal</dt><dd>' + esc(x.alasanBatal) + '</dd></div>' : '') + '</dl></div>' +
           (x.tindak.length ? '<div class="card card-b"><h3>Tindak lanjut</h3><div class="tl" style="margin-top:10px">' + x.tindak.map(function (t) { return '<div class="tl-i on"><span class="dot">' + ikon('check') + '</span><b>' + esc(t.jenis) + '</b> <span class="small muted">' + fmt.tgl(t.tanggal) + '</span><div class="small">' + esc(t.catatan || '') + '</div></div>'; }).join('') + '</div></div>' : '') +
           '<div class="row wrap-row">' + (x.status === 'Draft' ? '<button class="btn btn-amber grow" id="lanjutDraf">' + ikon('edit') + 'Lanjutkan draf</button><button class="btn btn-outline" id="hapusDraf" style="color:var(--bad)">' + ikon('delete') + 'Hapus draf</button>' : '<a class="btn btn-primary grow" href="#/surat/' + encodeURIComponent(x.id) + '">' + ikon('description') + 'Lihat / cetak surat</a>') + '</div>';
@@ -347,7 +382,7 @@
               noBuktiUji: x.noBuktiUji || '', masaBerlakuUji: x.masaBerlakuUji || '', lokasi: x.lokasi || '', lat: x.lat || '', lng: x.lng || '', foto: {}, duplikat: [], kotor: false };
             x.foto.forEach(function (f) { D.foto[f.slot] = { ok: 1, hash: f.hash }; }); FOTO = {}; ST = {}; simpanD(); location.hash = '#/catat';
           };
-          $('#hapusDraf').onclick = function () { UI.Modal.konfirm('Hapus draf ' + esc(x.nopol) + ' beserta fotonya?', { ok: 'Hapus', bahaya: true }).then(function (ok) { if (ok) App.api('etle.hapusDraft', { id: x.id }).then(function () { var d = bacaD(); if (d && d.id === x.id) hapusD(); App.toast('Draf dihapus.', 'ok'); App.swr('etle.list', {}, { fresh: true }).catch(function () {}); location.hash = '#/kasus'; }, function (e) { App.toast(e.message, 'bad'); }); }); };
+          $('#hapusDraf').onclick = function () { UI.Modal.konfirm('Hapus draf ' + esc(x.nopol) + ' beserta fotonya?', { ok: 'Hapus', bahaya: true }).then(function (ok) { if (ok) App.api('etle.hapusDraft', { id: x.id }).then(function () { var d = bacaD(); if (d && d.id === x.id) hapusD(); App.toast('Draf dihapus.', 'ok'); App.swr('etle.list', {}, { fresh: true }).catch(function () {}); App.swr('etle.ringkas', {}, { fresh: true }).catch(function () {}); location.hash = '#/kasus'; }, function (e) { App.toast(e.message, 'bad'); }); }); };
         }
       } }).catch(function (e) { MB.innerHTML = galat(e); });
     }
@@ -385,12 +420,16 @@
   function dashboard(el) {
     var hidup = Shell.hidup();
     el.innerHTML = Shell.judul(el, { eyebrow: 'Ringkasan', h: 'Dashboard Penindakan', p: 'Kasus berstatus Terbit atau Tindak Lanjut menahan penerbitan Kartu Pengawasan SIMAU untuk nopol yang sama.', aksi: '<a class="btn btn-amber" href="./?m=1#/catat?baru=1">' + ikon('add_a_photo') + 'Catat (tampilan lapangan)</a>' }) +
-      '<div class="grid g4" id="kpi">' + UI.sk.kartu(4) + '</div><div class="grid g2" style="margin-top:16px"><div class="card"><div class="card-h"><h3>Surat terbit per bulan</h3></div><div class="card-b" id="c1"></div></div><div class="card"><div class="card-h"><h3>Pasal terbanyak</h3></div><div class="card-b" id="c2"></div></div></div>' +
+      '<div class="grid g4" id="kpi">' + UI.sk.kartu(4) + '</div><div id="drafLama"></div><div class="grid g2" style="margin-top:16px"><div class="card"><div class="card-h"><h3>Surat terbit per bulan</h3></div><div class="card-b" id="c1"></div></div><div class="card"><div class="card-h"><h3>Pasal terbanyak</h3></div><div class="card-b" id="c2"></div></div></div>' +
       '<div class="card" style="margin-top:16px"><div class="card-h"><h3>' + ikon('pending_actions') + 'Perlu tindak lanjut</h3><a class="btn btn-ghost btn-sm" href="#/kasus?status=Terbit">Semua' + ikon('arrow_forward') + '</a></div><div id="perlu">' + UI.sk.baris(5) + '</div></div>';
     App.swr('etle.dashboard', {}, { maxAge: 30000, onData: function (d) {
       if (!hidup()) return;
       var k = d.kpi, st = function (l, v, i, w, ft) { return '<div class="card stat" style="border-left:4px solid ' + w + '"><div class="lbl">' + l + '<span class="ico">' + ikon(i) + '</span></div><div class="val">' + fmt.angka(v) + '</div>' + (ft ? '<div class="ft">' + ft + '</div>' : '') + '</div>'; };
       $('#kpi').innerHTML = st('Terbit bulan ini', k.bulanIni, 'assignment', 'var(--navy)') + st('Dalam proses', k.proses, 'hourglass_top', 'var(--bad)', 'menahan kartu SIMAU') + st('Selesai', k.selesai, 'task_alt', 'var(--ok)') + st('Draf', k.draft, 'edit_note', 'var(--muted)', k.dibatalkan + ' dibatalkan');
+      // Kartu draf terbengkalai (≥ 7 hari tidak diubah) — umur dihitung di perangkat agar tetap tepat walau data dari cache.
+      var lama = (d.draftAktif || []).filter(function (t) { return umurTgl(t) >= UMUR_BAWAAN; }).length;
+      $('#drafLama').innerHTML = lama ? '<a class="note warn" id="kartuDrafLama" href="#/kasus?lama=' + UMUR_BAWAAN + '" style="margin-top:16px;text-decoration:none;color:inherit;align-items:center">' + ikon('hourglass_disabled') +
+        '<div class="grow"><b>' + fmt.angka(lama) + ' draf terbengkalai</b> — tidak diubah ' + UMUR_BAWAAN + ' hari atau lebih. Periksa lalu hapus yang tidak akan diterbitkan.</div><span class="btn btn-outline btn-sm">Tinjau' + ikon('arrow_forward') + '</span></a>' : '';
       UI.Chart.batang($('#c1'), { label: d.bulan.map(fmt.bulan), seri: [{ nama: 'Surat', data: d.bulan.map(function (b) { return d.perBulan[b] || 0; }) }] });
       UI.Chart.batangH($('#c2'), { item: d.topJenis.map(function (x) { return { l: x.jenis, n: x.n }; }) });
       $('#perlu').innerHTML = d.perluTindak.length ? '<table class="tbl"><thead><tr><th>Nomor</th><th>Nopol</th><th>Pelanggaran</th><th>Lokasi</th><th class="right">Umur</th></tr></thead><tbody>' + d.perluTindak.map(function (x) {
@@ -401,27 +440,78 @@
 
   function semuaKasus(el, args, q) {
     if (q.get('id')) return detailKasus(el, q.get('id'));
-    var hidup = Shell.hidup(), tbl = null;
-    el.innerHTML = Shell.judul(el, { eyebrow: 'Penindakan', h: 'Semua Kasus', p: 'Klik baris untuk detail, tindak lanjut, koreksi, atau pembatalan.', aksi: '<button class="btn btn-outline" id="xl">' + ikon('download') + 'Ekspor Excel</button>' }) + '<div class="card" id="t">' + UI.sk.baris(10) + '</div>';
+    var hidup = Shell.hidup(), tbl = null, pilih = {}, tampil = [], lamaAktif = 0;
+    el.innerHTML = Shell.judul(el, { eyebrow: 'Penindakan', h: 'Semua Kasus', p: 'Klik baris untuk detail, tindak lanjut, koreksi, atau pembatalan.', aksi: '<button class="btn btn-outline" id="xl">' + ikon('download') + 'Ekspor Excel</button>' }) +
+      '<div id="barLama"></div><div class="card" id="t">' + UI.sk.baris(10) + '</div>';
+    /** Bilah aksi saat saringan "draf terbengkalai" aktif: pilih semua yang tersaring & hapus terpilih. */
+    function bilah() {
+      var b = $('#barLama'); if (!b) return;
+      $('#t').classList.toggle('mode-pilih', !!lamaAktif);
+      if (!lamaAktif) { b.innerHTML = ''; return; }
+      var n = Object.keys(pilih).length, semua = tampil.length && tampil.every(function (r) { return pilih[r.id]; });
+      b.innerHTML = '<div class="note warn" style="margin-bottom:12px;align-items:center;flex-wrap:wrap">' + ikon('hourglass_disabled') +
+        '<div class="grow"><b>' + fmt.angka(tampil.length) + ' draf</b> tidak diubah ' + lamaAktif + ' hari atau lebih. Centang yang akan dihapus; foto ikut dibuang ke Sampah Drive.</div>' +
+        '<label class="row" style="gap:6px;cursor:pointer;white-space:nowrap"><input type="checkbox" id="pilihSemua"' + (semua ? ' checked' : '') + (tampil.length ? '' : ' disabled') + '> Pilih semua (' + fmt.angka(tampil.length) + ')</label>' +
+        '<button class="btn btn-danger btn-sm" id="hapusPilih"' + (n ? '' : ' disabled') + '>' + ikon('delete') + 'Hapus terpilih (' + fmt.angka(n) + ')</button></div>';
+      $('#pilihSemua').onchange = function () { var on = this.checked; tampil.forEach(function (r) { if (on) pilih[r.id] = r; else delete pilih[r.id]; }); tbl.render(); };
+      $('#hapusPilih').onclick = hapusTerpilih;
+    }
+    function hapusTerpilih() {
+      var daftar = Object.keys(pilih).map(function (id) { return pilih[id]; }), n = daftar.length, batas = lamaAktif;
+      if (!n) return;
+      var petugas = {}; daftar.forEach(function (r) { petugas[r.petugas] = (petugas[r.petugas] || 0) + 1; });
+      UI.Modal.konfirm('Hapus <b>' + n + ' draf</b> yang tidak diubah ' + batas + ' hari atau lebih?<div class="small muted" style="margin-top:8px">' +
+        Object.keys(petugas).map(function (p) { return esc(p) + ': ' + petugas[p] + ' draf'; }).join('<br>') + '</div><div class="small" style="margin-top:8px">Foto ikut dibuang ke Sampah Drive. Data draf <b>tidak bisa dikembalikan</b>. Tindakan tercatat di Log Aktivitas.</div>',
+      { judul: 'Hapus draf terbengkalai', ok: 'Hapus ' + n + ' draf', bahaya: true, ketik: 'HAPUS' }).then(function (ok) {
+        if (!ok) return;
+        var ids = daftar.map(function (r) { return r.id; }), kel = [], total = 0, lewat = [];
+        for (var i = 0; i < ids.length; i += 100) kel.push(ids.slice(i, i + 100));
+        var b = $('#hapusPilih'); if (b) b.classList.add('loading');
+        kel.reduce(function (p, k) { return p.then(function () { return App.api('etle.hapusDraftMassal', { ids: k, minHari: batas }).then(function (r) { total += r.dihapus; lewat = lewat.concat(r.dilewati || []); }); }); }, Promise.resolve())
+          .then(function () {
+            App.toast(total + ' draf dihapus' + (lewat.length ? '; ' + lewat.length + ' dilewati (' + lewat.slice(0, 3).map(function (x) { return x.alasan; }).join(', ') + ')' : '') + '.', lewat.length ? 'warn' : 'ok');
+          }, function (e) { App.toast((total ? total + ' draf sudah dihapus, lalu gagal: ' : '') + e.message, 'bad'); })
+          .then(function () {
+            pilih = {};
+            App.swr('etle.dashboard', {}, { fresh: true }).catch(function () {});
+            return App.swr('etle.list', {}, { fresh: true }).then(function (d) { if (hidup() && tbl) tbl.setData(d); });
+          }).catch(function () {}).then(function () { var b2 = $('#hapusPilih'); if (b2) b2.classList.remove('loading'); });
+      });
+    }
     App.swr('etle.list', {}, { maxAge: 20000, onData: function (d) {
       if (!hidup()) return;
       if (!tbl) {
         tbl = UI.Tabel($('#t'), {
           cari: 'Cari nopol, nomor surat, lokasi, petugas…', perHal: 20, data: d,
           saringHtml: '<select class="sel" data-saring="status" style="width:160px;height:38px"><option value="">Semua status</option>' + ['Draft', 'Terbit', 'Tindak Lanjut', 'Selesai', 'Dibatalkan'].map(function (s) { return '<option>' + s + '</option>'; }).join('') + '</select>' +
-            '<select class="sel" data-saring="wilayah" style="width:180px;height:38px"><option value="">Semua kecamatan</option>' + (B ? B.kecamatan : []).map(function (s) { return '<option>' + esc(s) + '</option>'; }).join('') + '</select>',
-          saring: function (r, k, v) { return r[k] === v; },
-          kolom: [{ k: 'waktu', l: 'Waktu', f: function (r) { return fmt.tglJam(r.terbit || r.waktu); }, nilaiUrut: function (r) { return r.terbit || r.waktu; } }, { k: 'nomor', l: 'Nomor surat', cls: 'mono small' },
+            '<select class="sel" data-saring="wilayah" style="width:180px;height:38px"><option value="">Semua kecamatan</option>' + (B ? B.kecamatan : []).map(function (s) { return '<option>' + esc(s) + '</option>'; }).join('') + '</select>' +
+            '<select class="sel" data-saring="lama" style="width:230px;height:38px" aria-label="Draf terbengkalai"><option value="">Semua umur draf</option>' + UMUR_DRAF.map(function (n) { return '<option value="' + n + '">Draf terbengkalai ≥ ' + n + ' hari</option>'; }).join('') + '</select>',
+          saring: function (r, k, v) { return k === 'lama' ? r.status === 'Draft' && umurDraf(r) >= +v : r[k] === v; },
+          kolom: [{ k: '', l: '', cls: 'kol-pilih', w: '40px', sort: false, f: function (r) { return r.status === 'Draft' ? '<input type="checkbox" data-pilih="' + esc(r.id) + '"' + (pilih[r.id] ? ' checked' : '') + ' aria-label="Pilih draf ' + esc(r.nopol) + '">' : ''; } },
+            { k: 'waktu', l: 'Waktu', f: function (r) { return fmt.tglJam(r.terbit || r.waktu) + (r.status === 'Draft' && r.aktif ? '<div class="tiny' + (umurDraf(r) >= UMUR_BAWAAN ? '" style="color:var(--bad-tx);font-weight:600' : ' muted') + '">diubah ' + teksUmur(umurDraf(r)) + '</div>' : ''); }, nilaiUrut: function (r) { return r.terbit || r.waktu; } }, { k: 'nomor', l: 'Nomor surat', cls: 'mono small' },
             { k: 'nopol', l: 'Nopol', f: function (r) { return App.plat(r.nopol); }, cariNilai: function (r) { return r.nopol + ' ' + nn(r.nopol); } }, { k: 'jenis', l: 'Pelanggaran', f: function (r) { var p = pelanggaran(r.pasal, r.jenis); return p.pasal ? '<b class="small">' + esc(p.pasal) + '</b><div class="tiny muted">' + esc(p.jenis) + '</div>' : '<span class="small">' + esc(p.jenis) + '</span>'; } },
             { k: 'lokasi', l: 'Lokasi', f: function (r) { return '<span class="small">' + esc(r.lokasi || '') + '</span><div class="tiny muted">' + esc(r.wilayah || '') + '</div>'; } }, { k: 'petugas', l: 'Petugas', cls: 'small' }, { k: 'status', l: 'Status', f: function (r) { return App.badge(r.status); } }],
-          onRow: function (r) { location.hash = '#/kasus?id=' + encodeURIComponent(r.id); }, kosong: { ikon: 'assignment', judul: 'Belum ada kasus' }
+          onRow: function (r) { location.hash = '#/kasus?id=' + encodeURIComponent(r.id); }, kosong: { ikon: 'assignment', judul: 'Belum ada kasus' },
+          onRender: function (dd) {
+            tampil = dd; lamaAktif = tbl ? (+tbl.st.filter.lama || 0) : 0;   // tbl belum ada saat render pertama (saringan dari URL dipasang sesudahnya)
+            var ada = {}; dd.forEach(function (r) { ada[r.id] = 1; });
+            Object.keys(pilih).forEach(function (id) { if (!ada[id] || !lamaAktif) delete pilih[id]; });   // pilihan hanya untuk yang tersaring
+            bilah();
+          }
+        });
+        $('#t').addEventListener('change', function (e) {
+          var c = e.target.closest('[data-pilih]'); if (!c) return;
+          var r = tampil.filter(function (x) { return x.id === c.dataset.pilih; })[0];
+          if (c.checked && r) pilih[r.id] = r; else delete pilih[c.dataset.pilih];
+          bilah();
         });
         var s = $('[data-saring="status"]', $('#t')); if (s && q.get('status')) { s.value = q.get('status'); s.dispatchEvent(new Event('change')); }
+        var sl = $('[data-saring="lama"]', $('#t')); if (sl && UMUR_DRAF.indexOf(+q.get('lama')) > -1) { sl.value = q.get('lama'); sl.dispatchEvent(new Event('change')); }
       } else tbl.setData(d);
     } }).catch(function (e) { if (hidup()) $('#t').innerHTML = galat(e); });
     $('#xl').onclick = function () {
-      App.Xlsx.unduh('Kasus-ETLE-' + fmt.hariIni(), [{ nama: 'Kasus', kolom: ['ID', 'Nomor Surat', 'Status', 'Waktu', 'Terbit', 'Nopol', 'Jenis Kendaraan', 'Pasal', 'Pelanggaran', 'Sanksi', 'Kecamatan', 'Lokasi', 'Petugas', 'Jumlah Foto'],
-        baris: (tbl ? tbl.tersaring() : []).map(function (r) { return [r.id, r.nomor, r.status, r.waktu, r.terbit, r.nopol, r.jenisKendaraan, r.pasal, r.jenis, r.sanksi.join('; '), r.wilayah, r.lokasi, r.petugas, r.jumlahFoto]; }) }]);
+      App.Xlsx.unduh('Kasus-ETLE-' + fmt.hariIni(), [{ nama: 'Kasus', kolom: ['ID', 'Nomor Surat', 'Status', 'Waktu', 'Terbit', 'Nopol', 'Jenis Kendaraan', 'Pasal', 'Pelanggaran', 'Sanksi', 'Kecamatan', 'Lokasi', 'Petugas', 'Jumlah Foto', 'Draf terakhir diubah'],
+        baris: (tbl ? tbl.tersaring() : []).map(function (r) { return [r.id, r.nomor, r.status, r.waktu, r.terbit, r.nopol, r.jenisKendaraan, r.pasal, r.jenis, r.sanksi.join('; '), r.wilayah, r.lokasi, r.petugas, r.jumlahFoto, r.aktif || '']; }) }]);
     };
   }
 
@@ -433,7 +523,8 @@
         if (!hidup()) return;
         var terbuka = x.status === 'Terbit' || x.status === 'Tindak Lanjut', bisaKoreksi = x.status !== 'Draft' && x.status !== 'Dibatalkan';
         $('#dk').innerHTML = '<div class="ph"><div><div class="eyebrow">Kasus ' + esc(x.id) + '</div><h1 class="mono">' + esc(x.nomor || '(draf)') + '</h1><p>' + App.badge(x.status) + ' ' + App.plat(x.nopol) + ' · ' + (function (p) { return esc((p.pasal ? p.pasal + ' ' : '') + p.jenis); })(pelanggaran(x.pasal, x.jenis)) + '</p></div><div class="aksi">' +
-          (bisaKoreksi ? '<button class="btn btn-outline" id="koreksi">' + ikon('edit') + 'Koreksi</button><button class="btn btn-danger" id="batal">' + ikon('block') + 'Batalkan</button>' : '') + (x.status !== 'Draft' ? '<button class="btn btn-primary" id="surat">' + ikon('print') + 'Surat</button>' : '') + '</div></div>' +
+          (bisaKoreksi ? '<button class="btn btn-outline" id="koreksi">' + ikon('edit') + 'Koreksi</button><button class="btn btn-danger" id="batal">' + ikon('block') + 'Batalkan</button>' : '') + (x.status !== 'Draft' ? '<button class="btn btn-primary" id="surat">' + ikon('print') + 'Surat</button>' : '<button class="btn btn-danger" id="hapusDrafA">' + ikon('delete') + 'Hapus draf</button>') + '</div></div>' +
+          (x.status === 'Draft' ? '<div class="note ' + (umurDraf(x) >= UMUR_BAWAAN ? 'warn' : '') + '" style="margin-bottom:16px">' + ikon(umurDraf(x) >= UMUR_BAWAAN ? 'hourglass_disabled' : 'edit_note') + '<div>Draf belum terbit, milik <b>' + esc(x.petugas) + '</b>. Terakhir diubah <b>' + teksUmur(umurDraf(x)) + '</b>' + (x.aktif ? ' (' + fmt.tglJam(x.aktif) + ')' : '') + '. Petugas melanjutkannya dari HP; bila tidak akan diterbitkan, hapus draf ini.</div></div>' : '') +
           (terbuka ? '<div class="note crit" style="margin-bottom:16px">' + ikon('lock') + '<div>Kasus ini <b>menahan penerbitan Kartu Pengawasan SIMAU</b> untuk nopol ' + esc(x.nopol) + (x.kendaraanSimau ? ' (terdaftar di SIMAU)' : ' (tidak terdaftar di SIMAU)') + ' sampai berstatus Selesai atau Dibatalkan.</div></div>' : '') +
           '<div class="grid g2" style="align-items:start"><div class="stack"><div class="card"><div class="card-h"><h3>Data kasus</h3></div><div class="card-b"><dl class="dl">' +
           [['Waktu catat', fmt.tglJam(x.waktu)], ['Terbit', x.terbit ? fmt.tglJam(x.terbit) : '—'], ['Jenis kendaraan', esc(x.jenisKendaraan || '-')], ['Merek / warna', esc(x.merekWarna || '-')], ['Pemilik / pengemudi', esc(x.namaPemilik || '-')],
@@ -453,6 +544,17 @@
           e.preventDefault(); var f = this, d = UI.Form.data(f); d.id = x.id;
           var go = function () { UI.Form.muat(f.querySelector('button'), App.api('etle.tindak', d)).then(function (r) { App.toast('Tindak lanjut dicatat. Status: ' + r.status + '.', 'ok'); muat(true); App.swr('etle.list', {}, { fresh: true }).catch(function () {}); }, function (er) { App.toast(er.message, 'bad'); }); };
           if (d.jenis === 'Selesai') UI.Modal.konfirm('Tandai kasus <b>Selesai</b>? Blokir kartu SIMAU untuk ' + esc(x.nopol) + ' terbuka bila tidak ada kasus/sanksi lain.', { ok: 'Tandai selesai' }).then(function (ok) { if (ok) go(); }); else go();
+        };
+        if ($('#hapusDrafA')) $('#hapusDrafA').onclick = function () {
+          var u = umurDraf(x);
+          UI.Modal.konfirm('Hapus draf <b>' + esc(x.nopol) + '</b> milik <b>' + esc(x.petugas) + '</b>?<div class="small" style="margin-top:8px">Terakhir diubah ' + teksUmur(u) + '. Foto ikut dibuang ke Sampah Drive. Data draf <b>tidak bisa dikembalikan</b>. Tindakan tercatat di Log Aktivitas.</div>', { judul: 'Hapus draf', ok: 'Hapus draf', bahaya: true }).then(function (ok) {
+            if (!ok) return;
+            App.api('etle.hapusDraft', { id: x.id }).then(function () {
+              App.toast('Draf ' + x.nopol + ' dihapus.', 'ok');
+              App.swr('etle.dashboard', {}, { fresh: true }).catch(function () {});
+              App.swr('etle.list', {}, { fresh: true }).catch(function () {}).then(function () { location.hash = '#/kasus?status=Draft'; });
+            }, function (e) { App.toast(e.message, 'bad'); });
+          });
         };
         if ($('#surat')) $('#surat').onclick = function () { UI.Modal.buka({ judul: 'Surat ' + x.nomor, lebar: 'lebar', isi: '<div id="spM"></div>', onBuka: function (p) { suratPanel($('#spM', p), x.id); }, tombol: [{ l: 'Tutup' }] }); };
         if ($('#batal')) $('#batal').onclick = function () {

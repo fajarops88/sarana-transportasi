@@ -5,7 +5,7 @@
  * - Panggilan API Apps Script, login Google, QR: TIDAK pernah di-cache.
  * Naikkan VERSI bersamaan dengan js/versi.js agar cache lama dibuang.
  */
-const VERSI = '1.3.0';
+const VERSI = '1.3.1';
 const CACHE = 'simau-' + VERSI;
 const FONT = 'sarpras-font';
 const ASET = [
