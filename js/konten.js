@@ -1,6 +1,6 @@
 /**
  * konten.js — Panel Konten (Superadmin, Admin Konten): halaman profil, struktur, berita, pengumuman,
- * regulasi, kontak, survei, dan pengaduan masyarakat. Superadmin juga: akun, sistem, migrasi.
+ * regulasi, kontak, logo (situs + kop surat), survei, dan pengaduan masyarakat. Superadmin juga: akun, sistem, migrasi.
  * Semua bacaan lewat swr (tampil instan dari simpanan lokal) + batch otomatis saat pertama dibuka.
  */
 (function () {
@@ -221,6 +221,106 @@
     }).catch(function (e) { $('#fK').innerHTML = galat(e); });
   }
 
+  // ================================================================== LOGO (header situs/panel, favicon, kop surat)
+  function logo(el) {
+    var hidup = Shell.hidup(), siapSimpan = { kiri: null, kanan: null };
+    var BAWAAN = App.ROOT + 'icons/logo.svg';
+    function kartu(pos, judul, ket) {
+      return '<div class="card card-b stack" data-pos="' + pos + '"><div><h3 style="margin:0">' + judul + '</h3><div class="small muted" style="margin-top:4px">' + ket + '</div></div>' +
+        '<div style="height:150px;display:grid;place-items:center;border:1px solid var(--line);border-radius:10px;background:repeating-conic-gradient(#EEF2F7 0% 25%, #fff 0% 50%) 50%/16px 16px">' +
+        '<img data-prev data-logo-tetap alt="" style="max-height:126px;max-width:90%;object-fit:contain"><span class="small muted hide" data-kosong>Tidak ada logo</span></div>' +
+        '<div class="small muted" data-info></div>' +
+        '<div class="row wrap-row"><label class="btn btn-outline" style="cursor:pointer">' + ikon('upload') + 'Pilih gambar<input type="file" accept="image/png,image/jpeg,image/webp,image/svg+xml" hidden data-file></label>' +
+        '<button type="button" class="btn btn-primary" data-simpan disabled>' + ikon('save') + 'Simpan</button>' +
+        '<button type="button" class="btn btn-ghost" data-batal disabled>Batal</button>' +
+        '<button type="button" class="btn btn-ghost" data-hapus style="color:var(--bad);margin-left:auto">' + ikon('delete') + 'Hapus</button></div></div>';
+    }
+    el.innerHTML = Shell.judul(el, { eyebrow: 'Identitas', h: 'Logo', p: 'Dipakai di header situs dan panel, ikon tab browser, serta kop Kartu Pengawasan, laporan, dan Surat Penindakan ETLE. Berlaku untuk semua pengguna tanpa mengubah berkas frontend.', aksi: situs('') }) +
+      '<div class="grid g2" style="gap:16px;align-items:start">' +
+      kartu('kiri', 'Logo utama', 'Kiri kop surat, header situs dan panel, ikon tab browser. Biasanya lambang Pemerintah Kota Balikpapan.') +
+      kartu('kanan', 'Logo kanan kop (opsional)', 'Sisi kanan kop surat, misalnya logo Dinas Perhubungan. Bila kosong, sisi kanan kop dibiarkan kosong.') + '</div>' +
+      '<div class="card" style="margin-top:16px"><div class="card-h"><h3>' + ikon('description') + 'Pratinjau kop</h3><span class="tiny muted">Teks kop diatur di ETLE → Pengaturan</span></div><div class="card-b"><div class="kertas a4" style="box-shadow:none;margin:0;max-width:100%;min-height:0;padding:16px" id="pratKop"></div></div></div>' +
+      '<div class="note" style="margin-top:16px">' + ikon('info') + '<div class="small">Paling baik PNG berlatar transparan; JPG, WebP, dan SVG juga diterima. Gambar diperkecil di perangkat ini (sisi terpanjang 400 px) lalu disimpan sebagai PNG. ' +
+      'Perangkat lain memakai logo baru begitu membuka halaman berikutnya. Ikon aplikasi yang sudah dipasang di layar utama HP tidak ikut berubah karena berasal dari berkas <code>icons/</code>.</div></div>';
+
+    function sekarang(pos) { return pos === 'kiri' ? App.Logo.kiri() : App.Logo.kanan(); }
+    function gambar() {
+      ['kiri', 'kanan'].forEach(function (pos) {
+        var c = $('[data-pos="' + pos + '"]', el); if (!c) return;
+        var baru = siapSimpan[pos], ada = sekarang(pos), src = baru ? baru.url : ada || (pos === 'kiri' ? BAWAAN : '');
+        var img = $('[data-prev]', c);
+        img.classList.toggle('hide', !src); $('[data-kosong]', c).classList.toggle('hide', !!src);
+        if (src) { img.setAttribute('src', src);  }   // pratinjau tidak ikut diganti otomatis
+        $('[data-info]', c).innerHTML = baru ? '<b style="color:var(--ok-tx)">Siap disimpan</b> · ' + baru.w + '×' + baru.h + ' px · ' + baru.kb + ' KB'
+          : ada ? 'Logo unggahan sedang dipakai.' : pos === 'kiri' ? 'Masih logo bawaan (sementara).' : 'Belum ada logo kanan.';
+        $('[data-simpan]', c).disabled = !baru; $('[data-batal]', c).disabled = !baru; $('[data-hapus]', c).disabled = !ada;
+      });
+      kop();
+    }
+    function kop() {
+      var w = $('#pratKop', el); if (!w) return;
+      var L = siapSimpan.kiri ? siapSimpan.kiri.url : App.Logo.kiri() || BAWAAN, R = siapSimpan.kanan ? siapSimpan.kanan.url : App.Logo.kanan();
+      var k = KOP || {};
+      w.innerHTML = '<div class="kop" style="margin:0"><img src="' + esc(L) + '" alt="" data-logo-tetap style="object-fit:contain"><div class="t"><div>PEMERINTAH KOTA BALIKPAPAN</div><b>' + esc(String(k.dinas || 'DINAS PERHUBUNGAN KOTA BALIKPAPAN').toUpperCase()) + '</b><div>' + esc(String(k.bidang || 'BIDANG SARANA TRANSPORTASI').toUpperCase()) + '</div>' +
+        '<small>' + esc(k.alamat || '') + '</small></div>' + (R ? '<img src="' + esc(R) + '" alt="" data-logo-tetap style="object-fit:contain">' : '<img src="' + esc(L) + '" alt="" data-logo-tetap style="visibility:hidden">') + '</div>';
+    }
+    function olah(file) {
+      return new Promise(function (res, rej) {
+        if (!/^image\/(png|jpeg|webp|svg\+xml)$/.test(file.type)) return rej(new Error('Pilih gambar PNG, JPG, WebP, atau SVG.'));
+        if (file.size > 5 * 1048576) return rej(new Error('Gambar maksimal 5 MB.'));
+        var url = URL.createObjectURL(file), img = new Image();
+        img.onload = function () {
+          var w = img.naturalWidth || 400, h = img.naturalHeight || 400;
+          var s = file.type === 'image/svg+xml' ? 400 / Math.max(w, h) : Math.min(1, 400 / Math.max(w, h));
+          var cw = Math.max(1, Math.round(w * s)), ch = Math.max(1, Math.round(h * s)), cv = document.createElement('canvas');
+          cv.width = cw; cv.height = ch;
+          var g = cv.getContext('2d'); g.imageSmoothingQuality = 'high'; g.drawImage(img, 0, 0, cw, ch);
+          URL.revokeObjectURL(url);
+          var d = cv.toDataURL('image/png');
+          if (d.length > 400000) return rej(new Error('Hasil gambar masih terlalu besar (' + Math.round(d.length * 0.75 / 1024) + ' KB). Pakai gambar yang lebih sederhana.'));
+          res({ url: d, w: cw, h: ch, kb: Math.round(d.length * 0.75 / 1024), jpg: file.type === 'image/jpeg' });
+        };
+        img.onerror = function () { URL.revokeObjectURL(url); rej(new Error('Gambar tidak dapat dibaca.')); };
+        img.src = url;
+      });
+    }
+    function setelah(pos, r, url) {
+      var d = App.Logo.data(), o = { ver: r.ver, kiri: d.kiri || '', kanan: d.kanan || '' };
+      o[pos] = url;
+      App.Logo.simpan(r.ver ? o : null);
+      siapSimpan[pos] = null; gambar();
+    }
+    $$('[data-pos]', el).forEach(function (c) {
+      var pos = c.getAttribute('data-pos');
+      $('[data-file]', c).onchange = function () {
+        var f = this.files[0]; this.value = ''; if (!f) return;
+        olah(f).then(function (h) {
+          siapSimpan[pos] = h; gambar();
+          if (h.jpg) App.toast('JPG tidak punya latar transparan; kotak putih di sekitar logo akan ikut tampil.', 'warn');
+        }, function (e) { App.toast(e.message, 'bad'); });
+      };
+      $('[data-batal]', c).onclick = function () { siapSimpan[pos] = null; gambar(); };
+      $('[data-simpan]', c).onclick = function () {
+        var h = siapSimpan[pos]; if (!h) return;
+        UI.Form.muat(this, App.api('konten.logo.simpan', { posisi: pos, dataUrl: h.url })).then(function (r) {
+          setelah(pos, r, h.url); App.toast('Logo ' + (pos === 'kiri' ? 'utama' : 'kanan') + ' tersimpan dan langsung dipakai.', 'ok');
+        }, function (e) { App.toast(e.message, 'bad'); });
+      };
+      $('[data-hapus]', c).onclick = function () {
+        var b = this;
+        UI.Modal.konfirm(pos === 'kiri' ? 'Hapus logo utama? Situs dan kop kembali memakai logo bawaan.' : 'Hapus logo kanan kop?', { ok: 'Hapus', bahaya: true }).then(function (ok) {
+          if (!ok) return;
+          UI.Form.muat(b, App.api('konten.logo.simpan', { posisi: pos, hapus: true })).then(function (r) { setelah(pos, r, ''); App.toast('Logo dihapus.', 'ok'); }, function (e) { App.toast(e.message, 'bad'); });
+        });
+      };
+    });
+    var KOP = null;
+    App.swr('auth.config', {}, { maxAge: 3600000, onData: function (c) { if (!hidup()) return; KOP = { dinas: c.namaDinas, bidang: c.namaBidang, alamat: c.alamatKop }; kop(); } }).catch(function () {});
+    var dengar = function () { if (!hidup()) { document.removeEventListener('logo-berubah', dengar); return; } gambar(); };
+    document.addEventListener('logo-berubah', dengar);
+    gambar();
+  }
+
   // ================================================================== BERITA, PENGUMUMAN, REGULASI
   function berita(el, args, q) {
     el.innerHTML = Shell.judul(el, { eyebrow: 'Publikasi', h: 'Berita', p: 'Hanya berita berstatus <b>Tayang</b> yang terlihat di situs. Simpan sebagai Draf bila belum siap.', aksi: situs('#/berita') }) + '<div class="card" id="t"></div>';
@@ -285,13 +385,13 @@
     modul: 'konten', judul: 'Panel Konten', sub: 'Situs Bidang Sarana Transportasi', judulPendek: 'KONTEN', peran: ['Superadmin', 'Admin Konten'], awal: 'ringkasan',
     menu: [
       { grp: 'Utama', item: [{ h: '#/ringkasan', l: 'Ringkasan', i: 'dashboard' }] },
-      { grp: 'Halaman Profil', item: [{ h: '#/teks', l: 'Profil & Sambutan', i: 'article' }, { h: '#/poin', l: 'Visi, Misi, Tugas', i: 'flag' }, { h: '#/struktur', l: 'Struktur Organisasi', i: 'account_tree' }, { h: '#/kontak', l: 'Kontak', i: 'contact_phone' }] },
+      { grp: 'Halaman Profil', item: [{ h: '#/teks', l: 'Profil & Sambutan', i: 'article' }, { h: '#/poin', l: 'Visi, Misi, Tugas', i: 'flag' }, { h: '#/struktur', l: 'Struktur Organisasi', i: 'account_tree' }, { h: '#/kontak', l: 'Kontak', i: 'contact_phone' }, { h: '#/logo', l: 'Logo', i: 'image' }] },
       { grp: 'Publikasi', item: [{ h: '#/berita', l: 'Berita', i: 'newspaper' }, { h: '#/pengumuman', l: 'Pengumuman', i: 'campaign' }, { h: '#/regulasi', l: 'Regulasi', i: 'gavel' }] },
       { grp: 'Layanan', item: [{ h: '#/pengaduan', l: 'Pengaduan', i: 'forum', badge: 'aduan' }, { h: '#/survei', l: 'Survei Layanan', i: 'reviews' }] },
       { grp: 'Sistem', item: [{ h: '#/akun', l: 'Kelola Akun', i: 'group', peran: SA }, { h: '#/sistem', l: 'Sistem & Keamanan', i: 'shield', peran: SA }, { h: '#/impor', l: 'Migrasi Data', i: 'sync_alt', peran: SA }] }
     ],
     rute: {
-      ringkasan: ringkasan, teks: teks, poin: poin, struktur: struktur, kontak: kontak, berita: berita, pengumuman: pengumuman, regulasi: regulasi, survei: survei,
+      ringkasan: ringkasan, teks: teks, poin: poin, struktur: struktur, kontak: kontak, logo: logo, berita: berita, pengumuman: pengumuman, regulasi: regulasi, survei: survei,
       pengaduan: function (el, a, q) { Shell.halAduan(el, a, q, { onJumlah: function (n) { Shell.badgeMenu('aduan', n); } }); },
       akun: Shell.halAkun, sistem: Shell.halSistem, impor: Shell.halImpor
     },

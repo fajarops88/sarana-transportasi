@@ -1,6 +1,11 @@
 /* Versi aplikasi — WAJIB sama dengan sw.js (simau & etle), backend/Config.gs APP.versi, dan CHANGELOG.md */
-window.APP_VERSI = '1.1.0';
+window.APP_VERSI = '1.2.0';
 window.RIWAYAT_VERSI = [
+  { v: '1.2.0', tgl: '2026-11-20', isi: [
+    '[Konten] Menu Logo: unggah logo utama dan logo kanan kop langsung dari web, tanpa mengubah berkas frontend',
+    '[Sistem] Logo unggahan dipakai di header situs & panel, ikon tab browser, kop Kartu Pengawasan, laporan, dan Surat Penindakan ETLE',
+    '[Sistem] Perangkat lain memperbarui logo otomatis saat membuka halaman berikutnya'
+  ] },
   { v: '1.1.0', tgl: '2026-11-20', isi: [
     '[SIMAU] Satu kendaraan = satu checklist bernomor tetap (CEK-xxxx), tidak berubah walau diperiksa berkali-kali',
     '[SIMAU] Riwayat pemeriksaan per checklist: tanggal, hasil, petugas, rincian 15 item; hapus satu pemeriksaan tanpa mengubah nomor',

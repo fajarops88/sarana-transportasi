@@ -6,6 +6,7 @@
  *  - Sesi: token 6 jam di localStorage, peringatan sebelum habis
  *  - Perf.table(): ukuran waktu per panggilan (console)
  *  - util: esc, fmt, plat nomor, badge, toast, kompres foto, ekspor .xlsx
+ *  - Logo: logo unggahan dari Panel Konten menggantikan icons/logo.svg di semua halaman (tanpa ubah berkas)
  */
 (function () {
   'use strict';
@@ -129,6 +130,49 @@
     }
   };
 
+  // ------------------------------------------------------------------ logo unggahan (Panel Konten → Logo)
+  // Logo disimpan di perangkat (localStorage). Setiap jawaban server membawa versi logo (lv); bila berbeda,
+  // logo baru diambil SEKALI lewat publik.logo. Gambar bawaan icons/logo.svg & favicon diganti otomatis.
+  var Logo = {
+    K: 'sarpras_logo_v1', d: null, ambil: null, BAWAAN: /icons\/logo\.svg(\?.*)?$/,
+    data: function () { if (this.d) return this.d; try { this.d = JSON.parse(localStorage.getItem(this.K) || 'null') || {}; } catch (e) { this.d = {}; } return this.d; },
+    kiri: function () { return this.data().kiri || ''; },
+    kanan: function () { return this.data().kanan || ''; },
+    simpan: function (o) {
+      this.d = o && o.ver ? o : {};
+      try { if (o && o.ver) localStorage.setItem(this.K, JSON.stringify(o)); else localStorage.removeItem(this.K); } catch (e) {}
+      this.terapkan(document);
+      document.dispatchEvent(new CustomEvent('logo-berubah'));
+    },
+    /** Ganti src/href gambar logo bawaan di dalam akar (atau akar itu sendiri). */
+    terapkan: function (akar) {
+      var u = this.kiri(), self = this;
+      var els = (akar.matches && akar.matches('img,link') ? [akar] : []).concat($$('img,link[rel~="icon"]', akar));
+      els.forEach(function (el) {
+        if (el.hasAttribute('data-logo-tetap')) return;              // pratinjau di halaman Logo: jangan diganti
+        var atr = el.tagName === 'LINK' ? 'href' : 'src', asli = el.getAttribute('data-logo-asli');
+        if (u) {
+          if (asli === null) { if (!self.BAWAAN.test(el.getAttribute(atr) || '')) return; el.setAttribute('data-logo-asli', el.getAttribute(atr)); }
+          if (el.getAttribute(atr) !== u) {
+            el.setAttribute(atr, u);
+            if (atr === 'href') el.removeAttribute('type'); else el.style.objectFit = 'contain';
+          }
+        } else if (asli !== null) { el.setAttribute(atr, asli); el.removeAttribute('data-logo-asli'); }
+      });
+    },
+    lihat: function (lv) {
+      if (lv === undefined || lv === null) return;                 // backend lama: tidak membawa versi logo
+      var self = this; lv = String(lv);
+      setTimeout(function () {                                     // beri kesempatan penyimpan logo menulis versinya dulu
+        if (lv === String(self.data().ver || '') || self.ambil) return;
+        if (!lv) { if (self.data().ver) self.simpan(null); return; }
+        self.ambil = api('publik.logo', {}).then(function (d) {
+          self.ambil = null; self.simpan({ ver: d.ver || lv, kiri: d.kiri || '', kanan: d.kanan || '' });
+        }, function () { self.ambil = null; });
+      }, 0);
+    }
+  };
+
   // ------------------------------------------------------------------ API
   var WRITE = /(\.simpan|\.hapus|\.selesai|\.update|\.upload|\.foto$|fotoHapus|hapusDraft|terbitkan|\.tindak|\.koreksi|\.batal|\.reset|\.jalankan|logout|google|darurat|publik\.pengaduan|surveiKirim|rotasi|cadangan|\.kontak)$/;
   var writeEpoch = 0, inflight = {};
@@ -150,6 +194,7 @@
         var t = Math.round(performance.now() - t0);
         Perf.add({ a: label, t: t, s: j.ms, c: !!j.cached });
         Versi.lihat(j.v);
+        Logo.lihat(j.lv);
         if (server) { server.className = 'server' + (t > 6000 ? ' slow' : ''); server.textContent = t > 6000 ? 'Server lambat' : 'Server aktif'; }
         return j;
       })
@@ -344,7 +389,13 @@
     ROOT: ROOT, VERSI: VERSI, CFG: CFG,
     esc: esc, $: $, $$: $$, fmt: fmt, plat: plat, badge: badge, ikon: ikon, debounce: debounce, hashStr: hashStr, q: q,
     toast: toast, Sesi: Sesi, Perf: Perf, Versi: Versi, api: api, apiQ: apiQ, swr: swr, Simpan: Simpan,
-    warmUp: warmUp, kompres: kompres, bacaBerkas: bacaBerkas, Xlsx: Xlsx, Pasang: Pasang, daftarSW: daftarSW
+    warmUp: warmUp, kompres: kompres, bacaBerkas: bacaBerkas, Xlsx: Xlsx, Pasang: Pasang, daftarSW: daftarSW, Logo: Logo
   };
   window.Perf = Perf;
+  // logo unggahan dipasang sejak awal dan pada setiap elemen yang ditambahkan kemudian (header, menu, kop)
+  Logo.terapkan(document);
+  if (window.MutationObserver) new MutationObserver(function (ms) {
+    if (!Logo.kiri()) return;
+    ms.forEach(function (m) { Array.prototype.forEach.call(m.addedNodes, function (n) { if (n.nodeType === 1) Logo.terapkan(n); }); });
+  }).observe(document.documentElement, { childList: true, subtree: true });
 })();

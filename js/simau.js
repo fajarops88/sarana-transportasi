@@ -60,8 +60,10 @@
     return inp;
   }
   function kopHtml(k) {
-    return '<div class="kop"><img src="' + App.ROOT + 'icons/logo.svg" alt=""><div class="t"><div>PEMERINTAH KOTA BALIKPAPAN</div><b>' + esc(String(k.dinas || '').toUpperCase()) + '</b><div>' + esc(String(k.bidang || '').toUpperCase()) + '</div>' +
-      '<small>' + esc([k.alamat, k.telp ? 'Telp. ' + k.telp : ''].filter(String).join(' • ')) + '</small></div><img src="' + App.ROOT + 'icons/logo.svg" alt="" style="visibility:hidden"></div>';
+    var L = App.Logo.kiri() || App.ROOT + 'icons/logo.svg', R = App.Logo.kanan();
+    return '<div class="kop"><img src="' + esc(L) + '" alt="" style="object-fit:contain"><div class="t"><div>PEMERINTAH KOTA BALIKPAPAN</div><b>' + esc(String(k.dinas || '').toUpperCase()) + '</b><div>' + esc(String(k.bidang || '').toUpperCase()) + '</div>' +
+      '<small>' + esc([k.alamat, k.telp ? 'Telp. ' + k.telp : ''].filter(String).join(' • ')) + '</small></div>' +
+      (R ? '<img src="' + esc(R) + '" alt="" style="object-fit:contain">' : '<img src="' + esc(L) + '" alt="" style="visibility:hidden">') + '</div>';
   }
 
   // ================================================================== DASHBOARD

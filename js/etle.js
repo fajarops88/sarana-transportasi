@@ -20,8 +20,10 @@
   function galat(e) { return '<div class="card-b"><div class="note bad">' + ikon('error') + '<div>' + esc(e.message || e) + '</div></div></div>'; }
   function nn(s) { return String(s || '').toUpperCase().replace(/[^A-Z0-9]/g, ''); }
   function kop(k) {
-    return '<div class="kop"><img src="' + App.ROOT + 'icons/logo.svg" alt=""><div class="t"><div>PEMERINTAH KOTA BALIKPAPAN</div><b>' + esc(String(k.dinas || '').toUpperCase()) + '</b><div>' + esc(String(k.bidang || '').toUpperCase()) + '</div>' +
-      '<small>' + esc([k.alamat, k.telp ? 'Telp. ' + k.telp : ''].filter(String).join(' • ')) + '</small></div><img src="' + App.ROOT + 'icons/logo.svg" alt="" style="visibility:hidden"></div>';
+    var L = App.Logo.kiri() || App.ROOT + 'icons/logo.svg', R = App.Logo.kanan();
+    return '<div class="kop"><img src="' + esc(L) + '" alt="" style="object-fit:contain"><div class="t"><div>PEMERINTAH KOTA BALIKPAPAN</div><b>' + esc(String(k.dinas || '').toUpperCase()) + '</b><div>' + esc(String(k.bidang || '').toUpperCase()) + '</div>' +
+      '<small>' + esc([k.alamat, k.telp ? 'Telp. ' + k.telp : ''].filter(String).join(' • ')) + '</small></div>' +
+      (R ? '<img src="' + esc(R) + '" alt="" style="object-fit:contain">' : '<img src="' + esc(L) + '" alt="" style="visibility:hidden">') + '</div>';
   }
 
   // ================================================================== SURAT PENINDAKAN (A4) — dipakai HP & desktop
@@ -545,6 +547,7 @@
     App.swr('etle.pengaturan', {}, { maxAge: 60000, onData: function (s) {
       if (!hidup()) return;
       $('#fS').innerHTML = '<form id="fSet" class="stack-lg" style="max-width:900px"><div class="card"><div class="card-h"><h3>' + ikon('description') + 'Kop surat</h3></div><div class="card-b">' +
+        '<div class="note" style="margin-bottom:12px">' + ikon('image') + '<div class="small">Logo kop (kiri dan kanan) diganti di <b>Panel Konten → Logo</b>' + (['Superadmin', 'Admin Konten'].indexOf(me.role) > -1 ? ' — <a href="' + App.ROOT + 'konten/#/logo">buka</a>' : ' oleh Superadmin atau Admin Konten') + '.</div></div>' +
         UI.Form.bangun([{ k: 'nama_dinas', l: 'Nama dinas', full: true }, { k: 'nama_bidang', l: 'Nama bidang', full: true }, { k: 'alamat_kop', l: 'Alamat', full: true }, { k: 'telp_kop', l: 'Telepon' }], s.kop) + '</div></div>' +
         '<div class="card"><div class="card-h"><h3>' + ikon('draw') + 'Surat penindakan</h3></div><div class="card-b">' + UI.Form.bangun([{ k: 'format_nomor', l: 'Format nomor', mono: true, full: true, atr: ' style="text-transform:none"', hint: 'Wajib memuat {seq}. Tersedia {rom} (bulan Romawi), {bulan}, {tahun}. Nomor urut tidak pernah dipakai ulang.' },
           { k: 'pejabat_jabatan', l: 'Jabatan penandatangan', full: true }, { k: 'pejabat_nama', l: 'Nama pejabat' }, { k: 'pejabat_nip', l: 'NIP', mono: true },
