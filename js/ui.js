@@ -280,13 +280,16 @@
         var k = inp.dataset.unggah, wadah = form.querySelector('[data-prev="' + k + '"]'), tbl = inp.closest('label');
         inp.onchange = function () {
           var file = inp.files[0]; if (!file) return;
-          tbl.classList.add('loading');
+          // Penanda unggahan berjalan: tombol Simpan menunggu sampai selesai (1.3.5).
+          var tulisan = tbl.querySelector('span:not(.ms)'), awal = tulisan.textContent;
+          var selesai = function () { tbl.classList.remove('loading'); tulisan.textContent = awal; form.dataset.mengunggah = Math.max(0, (+form.dataset.mengunggah || 0) - 1); };
+          tbl.classList.add('loading'); tulisan.textContent = 'Mengunggah…'; form.dataset.mengunggah = (+form.dataset.mengunggah || 0) + 1;
           fn(file, /pdf/.test(inp.accept) ? 'pdf' : 'gambar').then(function (url) {
-            tbl.classList.remove('loading'); form.querySelector('input[name="' + k + '"]').value = url;
+            selesai(); form.querySelector('input[name="' + k + '"]').value = url;
             var img = wadah.querySelector('img'), a = wadah.querySelector('a');
             if (img) { img.src = url; img.style.display = ''; } if (a) { a.href = url; a.style.display = ''; }
             wadah.querySelector('[data-kosongkan]').style.display = ''; App.toast('Berkas terunggah.', 'ok');
-          }, function (e) { tbl.classList.remove('loading'); App.toast(e.message, 'bad'); });
+          }, function (e) { selesai(); App.toast(e.message, 'bad'); });
           inp.value = '';
         };
         var hapus = wadah.querySelector('[data-kosongkan]');

@@ -185,8 +185,10 @@
     return u;
   }
 
-  function kirim(body, label) {
-    var t0 = performance.now(), ctrl = new AbortController(), timer = setTimeout(function () { ctrl.abort(); }, 90000);
+  // batas: batas waktu (ms). Bawaan 90 detik; unggah PDF besar memakai batas lebih panjang (1.3.5).
+  function kirim(body, label, batas) {
+    batas = batas || 90000;
+    var t0 = performance.now(), ctrl = new AbortController(), timer = setTimeout(function () { ctrl.abort(); }, batas);
     var server = document.querySelector('.server');
     return fetch(urlGas(), { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify(body), signal: ctrl.signal, redirect: 'follow' })
       .then(function (r) { if (!r.ok) throw ApiError('Server menjawab ' + r.status + '. Coba lagi.', 'HTTP'); return r.json(); })
@@ -203,7 +205,7 @@
         clearTimeout(timer);
         if (server) { server.className = 'server off'; server.textContent = 'Server tidak terjangkau'; }
         if (e.kode) throw e;
-        if (e.name === 'AbortError') throw ApiError('Server terlalu lama menjawab (90 detik). Periksa sinyal lalu coba lagi.', 'TIMEOUT');
+        if (e.name === 'AbortError') throw ApiError('Server terlalu lama menjawab (' + Math.round(batas / 1000) + ' detik). Periksa sinyal lalu coba lagi.', 'TIMEOUT');
         throw ApiError(navigator.onLine === false ? 'Tidak ada koneksi internet.' : 'Tidak dapat terhubung ke server. Periksa koneksi lalu coba lagi.', 'NET');
       });
   }
@@ -219,7 +221,7 @@
     data = Object.assign({}, data || {});
     if (opts && opts.fresh) data._fresh = true;
     var isWrite = WRITE.test(action);
-    if (isWrite) { writeEpoch++; return kirim({ action: action, data: data, token: Sesi.token() }, action).then(function (j) { return cekJawaban(j, action); }); }
+    if (isWrite) { writeEpoch++; return kirim({ action: action, data: data, token: Sesi.token() }, action, opts && opts.batasWaktu).then(function (j) { return cekJawaban(j, action); }); }
     var k = writeEpoch + '|' + action + '|' + JSON.stringify(data);
     if (inflight[k]) return inflight[k];
     var p = kirim({ action: action, data: data, token: Sesi.token() }, action).then(function (j) { return cekJawaban(j, action); });

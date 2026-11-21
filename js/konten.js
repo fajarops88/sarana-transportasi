@@ -15,9 +15,19 @@
   function galat(e) { return '<div class="card-b"><div class="note bad">' + ikon('error') + '<div>' + esc(e.message || e) + '</div></div></div>'; }
   function unggah(file, jenis) {
     var p;
-    if (jenis === 'pdf') { if (file.type !== 'application/pdf') return Promise.reject(new Error('Pilih berkas PDF.')); if (file.size > 30 * 1048576) return Promise.reject(new Error('PDF maksimal 30 MB.')); p = App.bacaBerkas(file); }
+    var opsi = null;
+    if (jenis === 'pdf') {
+      if (file.type !== 'application/pdf') return Promise.reject(new Error('Pilih berkas PDF.'));
+      if (file.size > 30 * 1048576) return Promise.reject(new Error('PDF maksimal 30 MB (berkas ini ' + (file.size / 1048576).toFixed(1).replace('.', ',') + ' MB).'));
+      p = App.bacaBerkas(file);
+      // PDF besar butuh waktu kirim lebih lama: beri batas 5 menit (batas eksekusi Apps Script ± 6 menit).
+      if (file.size > 5 * 1048576) {
+        opsi = { batasWaktu: 300000 };
+        App.toast('Mengunggah PDF ' + (file.size / 1048576).toFixed(1).replace('.', ',') + ' MB. Bisa 1–3 menit, jangan tutup jendela ini.', 'info', 8000);
+      }
+    }
     else p = App.kompres(file, 1600, 450);
-    return p.then(function (u) { return App.api('konten.upload', { nama: file.name, dataUrl: u }); }).then(function (r) { return r.url; });
+    return p.then(function (u) { return App.api('konten.upload', { nama: file.name, dataUrl: u }, opsi); }).then(function (r) { return r.url; });
   }
   function situs(hash) { return '<a class="btn btn-outline" href="' + App.ROOT + (hash || '') + '" target="_blank" rel="noopener">' + ikon('open_in_new') + 'Lihat di situs</a>'; }
 
@@ -49,7 +59,9 @@
         isi: '<form id="fCrud" novalidate>' + UI.Form.bangun(typeof cfg.fields === 'function' ? cfg.fields(r, semua) : cfg.fields, r) + '</form>',
         onBuka: function (p) { UI.Form.pasangUnggah($('#fCrud', p), unggah); if (cfg.onForm) cfg.onForm($('#fCrud', p), r); },
         tombol: [{ l: 'Batal' }, { l: 'Simpan', cls: 'btn-primary', ikon: 'save', aksi: function (b, p) {
-          var f = $('#fCrud', p); if (!UI.Form.wajib(f)) return false;
+          var f = $('#fCrud', p);
+          if (f.dataset.mengunggah > 0) { App.toast('Tunggu sampai berkas selesai terunggah, lalu tekan Simpan.', 'warn'); return false; }
+          if (!UI.Form.wajib(f)) return false;
           var row = UI.Form.ambil(f); if (!baru) row.ID = r.ID;
           if (cfg.sebelumSimpan) { var pesan = cfg.sebelumSimpan(row); if (pesan) { App.toast(pesan, 'warn'); return false; } }
           return simpan(cfg.tabel, row).then(function (x) {

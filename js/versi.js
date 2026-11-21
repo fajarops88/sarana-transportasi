@@ -1,6 +1,11 @@
 /* Versi aplikasi — WAJIB sama dengan sw.js (simau & etle), backend/Config.gs APP.versi, dan CHANGELOG.md */
-window.APP_VERSI = '1.3.4';
+window.APP_VERSI = '1.3.5';
 window.RIWAYAT_VERSI = [
+  { v: '1.3.5', tgl: '2026-11-22', isi: [
+    '[Panel Konten] Regulasi: batas unggah PDF naik dari 8 MB menjadi 30 MB',
+    '[Panel Konten] Unggah PDF di atas 5 MB diberi waktu tunggu 5 menit dan pemberitahuan sedang mengunggah',
+    '[Panel] Tombol Simpan menunggu sampai berkas selesai terunggah (regulasi tidak tersimpan tanpa PDF)'
+  ] },
   { v: '1.3.4', tgl: '2026-11-21', isi: [
     '[Website] Bagan Struktur Organisasi bergaris: garis komando (tegas) Kepala Bidang → Kepala Seksi → staf, garis koordinasi (putus-putus) ke Kelompok Jabatan Fungsional',
     '[Website] Bagan mendatar di laptop, otomatis menurun di HP atau bila cabang tidak muat',
