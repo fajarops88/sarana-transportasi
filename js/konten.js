@@ -15,7 +15,7 @@
   function galat(e) { return '<div class="card-b"><div class="note bad">' + ikon('error') + '<div>' + esc(e.message || e) + '</div></div></div>'; }
   function unggah(file, jenis) {
     var p;
-    if (jenis === 'pdf') { if (file.type !== 'application/pdf') return Promise.reject(new Error('Pilih berkas PDF.')); if (file.size > 8 * 1048576) return Promise.reject(new Error('PDF maksimal 8 MB.')); p = App.bacaBerkas(file); }
+    if (jenis === 'pdf') { if (file.type !== 'application/pdf') return Promise.reject(new Error('Pilih berkas PDF.')); if (file.size > 30 * 1048576) return Promise.reject(new Error('PDF maksimal 30 MB.')); p = App.bacaBerkas(file); }
     else p = App.kompres(file, 1600, 450);
     return p.then(function (u) { return App.api('konten.upload', { nama: file.name, dataUrl: u }); }).then(function (r) { return r.url; });
   }
@@ -444,7 +444,7 @@
   }
 
   function regulasi(el, args, q) {
-    el.innerHTML = Shell.judul(el, { eyebrow: 'Publikasi', h: 'Regulasi', p: 'Peraturan yang dapat diunduh masyarakat. Unggah PDF resmi (maks. 8 MB).', aksi: situs('#/regulasi') }) + '<div class="card" id="t"></div>';
+    el.innerHTML = Shell.judul(el, { eyebrow: 'Publikasi', h: 'Regulasi', p: 'Peraturan yang dapat diunduh masyarakat. Unggah PDF resmi (maks. 30 MB).', aksi: situs('#/regulasi') }) + '<div class="card" id="t"></div>';
     var c = crud($('#t'), {
       tabel: 'WEB_Regulasi', judul: 'regulasi', tambah: 'Tambah regulasi', sortAwal: 'TAHUN', dirAwal: -1, kosong: { ikon: 'gavel', judul: 'Belum ada regulasi' },
       kolom: [{ k: 'JUDUL', l: 'Judul', f: function (r) { return '<b>' + esc(r.JUDUL) + '</b>'; } }, { k: 'JENIS', l: 'Jenis' }, { k: 'NOMOR', l: 'Nomor', cls: 'mono' }, { k: 'TAHUN', l: 'Tahun', cls: 'mono' },
